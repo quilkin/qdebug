@@ -32,17 +32,17 @@
             System.Windows.Forms.Label baudRateLabel;
             System.Windows.Forms.Label portNameLabel;
             this.baudRateComboBox = new System.Windows.Forms.ComboBox();
+            this.serialSettingsBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.portNameComboBox = new System.Windows.Forms.ComboBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.btnStart = new System.Windows.Forms.Button();
             this.tbData = new System.Windows.Forms.TextBox();
-            this.serialSettingsBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.btnStop = new System.Windows.Forms.Button();
             this.buttonSend = new System.Windows.Forms.Button();
             this.textToSend = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
             this.varView = new System.Windows.Forms.ListView();
-            this.label1 = new System.Windows.Forms.Label();
+            this.labelSketch = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.sourceView = new System.Windows.Forms.ListView();
             this.columnBP = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -51,14 +51,13 @@
             this.columnAddr = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.buttonLoad = new System.Windows.Forms.Button();
             this.listDisassembly = new System.Windows.Forms.ListView();
-            this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             baudRateLabel = new System.Windows.Forms.Label();
             portNameLabel = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
             this.panel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
-
             this.SuspendLayout();
             // 
             // baudRateLabel
@@ -181,14 +180,14 @@
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             // 
-            // label1
+            // labelSketch
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(19, 15);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(64, 13);
-            this.label1.TabIndex = 20;
-            this.label1.Text = "Your sketch";
+            this.labelSketch.AutoSize = true;
+            this.labelSketch.Location = new System.Drawing.Point(19, 15);
+            this.labelSketch.Name = "labelSketch";
+            this.labelSketch.Size = new System.Drawing.Size(64, 13);
+            this.labelSketch.TabIndex = 20;
+            this.labelSketch.Text = "Your sketch";
             // 
             // label2
             // 
@@ -259,15 +258,15 @@
             this.listDisassembly.UseCompatibleStateImageBehavior = false;
             this.listDisassembly.View = System.Windows.Forms.View.Details;
             // 
-            // columnHeader1
-            // 
-            this.columnHeader1.Text = "Disassembly";
-            this.columnHeader1.Width = 328;
-            // 
             // columnNum
             // 
             this.columnNum.Text = "#";
             this.columnNum.Width = 40;
+            // 
+            // columnHeader1
+            // 
+            this.columnHeader1.Text = "Disassembly";
+            this.columnHeader1.Width = 328;
             // 
             // MainForm
             // 
@@ -278,17 +277,16 @@
             this.Controls.Add(this.buttonLoad);
             this.Controls.Add(this.sourceView);
             this.Controls.Add(this.label2);
-            this.Controls.Add(this.label1);
+            this.Controls.Add(this.labelSketch);
             this.Controls.Add(this.varView);
             this.Controls.Add(this.panel1);
             this.Name = "MainForm";
             this.Text = "Arduino Debugger";
+            ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).EndInit();
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).EndInit();
-
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -307,7 +305,7 @@
         private System.Windows.Forms.TextBox textToSend;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.ListView varView;
-        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Label labelSketch;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.ListView sourceView;
         private System.Windows.Forms.Button buttonLoad;

@@ -101,10 +101,7 @@ namespace SerialPortListener.Serial
             // Setting serial port settings
             _serialPort = new SerialPort(
                 _currentSerialSettings.PortName,
-                _currentSerialSettings.BaudRate,
-                _currentSerialSettings.Parity,
-                _currentSerialSettings.DataBits,
-                _currentSerialSettings.StopBits);
+                _currentSerialSettings.BaudRate);
 
             // Subscribe to event and open serial port for data
             _serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);

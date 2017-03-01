@@ -17,10 +17,7 @@ namespace SerialPortListener.Serial
         string[] _portNameCollection;
         int _baudRate = 9600;
         BindingList<int> _baudRateCollection = new BindingList<int>();
-        Parity _parity = Parity.None;
-        int _dataBits = 8;
-        int[] _dataBitsCollection = new int[] { 5, 6, 7, 8 };
-        StopBits _stopBits = StopBits.One;
+
 
         #region Properties
         /// <summary>
@@ -55,52 +52,6 @@ namespace SerialPortListener.Serial
         }
 
         /// <summary>
-        /// One of the Parity values.
-        /// </summary>
-        public Parity Parity
-        {
-            get { return _parity; }
-            set 
-            {
-                if (_parity != value)
-                {
-                    _parity = value;
-                    SendPropertyChangedEvent("Parity");
-                }
-            }
-        }
-        /// <summary>
-        /// The data bits value.
-        /// </summary>
-        public int DataBits
-        {
-            get { return _dataBits; }
-            set
-            {
-                if (_dataBits != value)
-                {
-                    _dataBits = value;
-                    SendPropertyChangedEvent("DataBits");
-                }
-            }
-        }
-        /// <summary>
-        /// One of the StopBits values.
-        /// </summary>
-        public StopBits StopBits
-        {
-            get { return _stopBits; }
-            set
-            {
-                if (_stopBits != value)
-                {
-                    _stopBits = value;
-                    SendPropertyChangedEvent("StopBits");
-                }
-            }
-        }
-
-        /// <summary>
         /// Available ports on the computer
         /// </summary>
         public string[] PortNameCollection
@@ -117,14 +68,6 @@ namespace SerialPortListener.Serial
             get { return _baudRateCollection; }
         }
 
-        /// <summary>
-        /// Available databits setting
-        /// </summary>
-        public int[] DataBitsCollection
-        {
-            get { return _dataBitsCollection; }
-            set { _dataBitsCollection = value; }
-        }
 
         #endregion
 
