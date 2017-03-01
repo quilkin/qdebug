@@ -6,7 +6,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Diagnostics;
 
-namespace SerialPortListener
+namespace ArdDebug
 {
     class Arduino
     {
@@ -14,6 +14,8 @@ namespace SerialPortListener
         private ListView source,disassembly;
         public String ShortFilename { private set; get; }
         public String FullFilename { private set; get; }
+
+        private List<Breakpoint> Breakpoints = new List<Breakpoint>();
 
         private bool openSourceFile()
         {
@@ -74,11 +76,20 @@ namespace SerialPortListener
             // find the .elf file corresponding to this sketch
             string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
             string elfPath = null;
+            bool found = false;
             foreach (string path in arduinoPaths)
             {
                 elfPath = path + "\\" + ShortFilename + ".elf";
                 if (File.Exists(elfPath))
+                {
+                    found = true;
                     break;
+                }
+            }
+            if (!found)
+            {
+                MessageBox.Show("No compiled files found. You may need to recomplie your project");
+                return false;
             }
             // Use ProcessStartInfo class
             // objdump - d progcount2.ino.elf > progcount2.ino.lss
@@ -87,7 +98,7 @@ namespace SerialPortListener
             startInfo.UseShellExecute = false;
             startInfo.FileName = "objdump.exe";
             startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-            startInfo.Arguments = "-d -S -l -t -g -C " + elfPath;
+            startInfo.Arguments = "-d -S -l -t -C " + elfPath;
             startInfo.RedirectStandardOutput = true;
 
             try
@@ -118,12 +129,59 @@ namespace SerialPortListener
                 return false;
             }
             int count = 1;
-            foreach (var line in System.IO.File.ReadLines(ShortFilename + ".lss"))
+            Breakpoint bp = null;
+            
+            foreach (string line in File.ReadLines(ShortFilename + ".lss"))
             {
                 ListViewItem lvi = new ListViewItem();
                 lvi.Text = (count++).ToString();
-                lvi.SubItems.Add(line);
+                lvi.SubItems.Add(line.Replace("\t", "    "));
                 disassembly.Items.Add(lvi);
+                
+                if (bp != null)
+                {
+                    // in the middle of breakpoint parse. Find the line containing te debug info (see below)
+                    int colon = line.LastIndexOf(':');
+                    if (colon >= 0)
+                    {
+                        string strPC = line.Substring(0, colon);
+                        ushort progCounter;
+                        if (ushort.TryParse(strPC, System.Globalization.NumberStyles.HexNumber, null, out progCounter))
+                        {
+                            bp.SetDetails(progCounter, line);
+                            Breakpoints.Add(bp);
+                            bp = null;
+                        }
+                        else
+                        {
+                            // might happen if there is a comment with a colon in it...
+                            MessageBox.Show("confusing debug line? " + line);
+                        };
+                    }
+                }
+                if (line.Contains(ShortFilename))
+                {
+                    // there should be a debuggable line shortly after, e.g.
+                    ////    C: \Users\chris\Documents\Arduino\sketch_feb26a / sketch_feb26a.ino:31
+                    ////    float f;
+                    ////    for (int index = 0; index < 5; index++)
+                    ////         790:	1e 82           std Y+6, r1; 0x06  
+                    // In this case, line 31 would be a breakpoint, pointing to address 0x0790
+                    // We need to parse these lines (from filename line, as far as the line with the address ':')
+                    int colon = line.LastIndexOf(':');
+                    string strSourceLine = line.Substring(colon + 1);
+                    int sourceLine = 0;
+                    if (int.TryParse(strSourceLine, out sourceLine))
+                    {
+                        bp = new Breakpoint(ShortFilename, sourceLine);
+                    }
+                }
+                
+            }
+            if (disassembly.Items.Count < 3)
+            {
+                MessageBox.Show("error with disaassembly listing");
+                return false;
             }
             return true;
 

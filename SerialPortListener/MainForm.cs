@@ -6,10 +6,10 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using SerialPortListener.Serial;
+using ArdDebug.Serial;
 using System.IO;
 
-namespace SerialPortListener
+namespace ArdDebug
 {
     public partial class MainForm : Form
     {

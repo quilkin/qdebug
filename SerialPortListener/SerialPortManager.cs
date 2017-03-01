@@ -8,7 +8,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.IO;
 
-namespace SerialPortListener.Serial
+namespace ArdDebug.Serial
 {
     /// <summary>
     /// Manager for serial port data

@@ -1,4 +1,4 @@
-﻿namespace SerialPortListener
+﻿namespace ArdDebug
 {
     partial class MainForm
     {
