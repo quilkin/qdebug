@@ -38,30 +38,7 @@ namespace ArdDebug
 
                     ListViewItem lvi = new ListViewItem();
                     lvi.Text = ""; // for breakpoint markers
-                    if (trimmed.StartsWith("//") || trimmed.Length < 3)
-                    {
-                        // don't allow breakpoints on comments or empty lines
-                        lvi.Checked = true;
 
-                    }
-                    if (trimmed.StartsWith("volatile") || trimmed.StartsWith("unsigned") || trimmed.StartsWith("void") || trimmed.StartsWith("char"))
-                    {
-                        // don't allow breakpoints on variable declarations
-                        lvi.Checked = true;
-
-                    }
-                    if (trimmed.StartsWith("int") || trimmed.StartsWith("byte") || trimmed.StartsWith("long"))
-                    {
-                        // don't allow breakpoints on  variable declarations
-                        lvi.Checked = true;
-
-                    }
-                    if (trimmed.StartsWith("float") || trimmed.StartsWith("double") || trimmed.StartsWith("bool"))
-                    {
-                        // don't allow breakpoints on  variable declarations
-                        lvi.Checked = true;
-
-                    }
                     lvi.SubItems.Add((count++).ToString());
                     lvi.SubItems.Add(untabbed);
                     source.Items.Add(lvi);
@@ -142,7 +119,7 @@ namespace ArdDebug
                 {
                     // in the middle of breakpoint parse. Find the line containing te debug info (see below)
                     int colon = line.LastIndexOf(':');
-                    if (colon >= 0)
+                    if (colon >= 0 && colon < 12) // to avoid colons in comments etc
                     {
                         string strPC = line.Substring(0, colon);
                         ushort progCounter;
@@ -150,11 +127,18 @@ namespace ArdDebug
                         {
                             bp.SetDetails(progCounter, line);
                             Breakpoints.Add(bp);
+                            // find the line in the source view and mark as appropriate
+                            ListView.ListViewItemCollection sourceItems = source.Items;
+                            ListViewItem sourceItem = sourceItems[bp.SourceLine-1];
+                            if (sourceItem != null)
+                            {
+                                sourceItem.Checked = true;
+                            }                            
                             bp = null;
                         }
                         else
                         {
-                            // might happen if there is a comment with a colon in it...
+                            // might happen .....
                             MessageBox.Show("confusing debug line? " + line);
                         };
                     }
@@ -187,6 +171,17 @@ namespace ArdDebug
 
         }
 
+        /// <summary>
+        /// use the list of breakpoint-able lines to determine the next place to 'single-step' to
+        /// </summary>
+        /// <param name="pc">pc at current breakpoint</param>
+        /// <returns>next pc to pause execution</returns>
+        //public ushort FindNextPC(ushort pc)
+        //{
+          
+
+        //}
+
 
         public bool OpenFiles(ListView source, ListView disassembly)
         {
@@ -195,7 +190,10 @@ namespace ArdDebug
             if (openSourceFile())
             {
                 if (OpenDisassembly())
+                {
+
                     return true;
+                }
 
             }
             MessageBox.Show("Problem opening files");

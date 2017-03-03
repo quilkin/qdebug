@@ -32,6 +32,14 @@ namespace ArdDebug.Serial
             Dispose(false);
         }
 
+        public void ReScan()
+        {
+            // Finding installed serial ports on hardware
+            _currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
+            // If serial ports is found, we select the first found
+            if (_currentSerialSettings.PortNameCollection.Length > 0)
+                _currentSerialSettings.PortName = _currentSerialSettings.PortNameCollection[0];
+        }
 
         #region Fields
         private SerialPort _serialPort;
@@ -87,7 +95,13 @@ namespace ArdDebug.Serial
             {
                 _serialPort.Write(s);
             }
-
+        }
+        public void Send(byte[] bytes)
+        {
+            if (_serialPort != null && _serialPort.IsOpen)
+            {
+                _serialPort.Write(bytes, 0, bytes.Length);
+            }
         }
         /// <summary>
         /// Connects to a serial port defined through the current settings
@@ -102,7 +116,10 @@ namespace ArdDebug.Serial
             _serialPort = new SerialPort(
                 _currentSerialSettings.PortName,
                 _currentSerialSettings.BaudRate);
-
+           // _serialPort.Handshake = Handshake.RequestToSend;
+            _serialPort.RtsEnable = true;
+            _serialPort.DtrEnable = true;
+            //_serialPort.ReadTimeout = 500;
             // Subscribe to event and open serial port for data
             _serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
             _serialPort.Open();

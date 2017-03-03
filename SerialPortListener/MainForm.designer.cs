@@ -53,6 +53,7 @@
             this.listDisassembly = new System.Windows.Forms.ListView();
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.buttonScan = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             portNameLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
@@ -98,13 +99,14 @@
             // 
             // groupBox1
             // 
+            this.groupBox1.Controls.Add(this.buttonScan);
             this.groupBox1.Controls.Add(this.baudRateComboBox);
             this.groupBox1.Controls.Add(baudRateLabel);
             this.groupBox1.Controls.Add(this.portNameComboBox);
             this.groupBox1.Controls.Add(portNameLabel);
             this.groupBox1.Location = new System.Drawing.Point(11, 14);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(191, 86);
+            this.groupBox1.Size = new System.Drawing.Size(282, 86);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "COM Settings (must be same as your sketch)";
@@ -128,7 +130,7 @@
             this.tbData.Multiline = true;
             this.tbData.Name = "tbData";
             this.tbData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbData.Size = new System.Drawing.Size(185, 126);
+            this.tbData.Size = new System.Drawing.Size(355, 327);
             this.tbData.TabIndex = 13;
             // 
             // btnStop
@@ -167,14 +169,14 @@
             this.panel1.Controls.Add(this.textToSend);
             this.panel1.Controls.Add(this.btnStart);
             this.panel1.Controls.Add(this.btnStop);
-            this.panel1.Location = new System.Drawing.Point(972, 21);
+            this.panel1.Location = new System.Drawing.Point(802, 21);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(205, 293);
+            this.panel1.Size = new System.Drawing.Size(375, 494);
             this.panel1.TabIndex = 17;
             // 
             // varView
             // 
-            this.varView.Location = new System.Drawing.Point(983, 340);
+            this.varView.Location = new System.Drawing.Point(532, 324);
             this.varView.Name = "varView";
             this.varView.Size = new System.Drawing.Size(185, 191);
             this.varView.TabIndex = 19;
@@ -192,7 +194,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(969, 324);
+            this.label2.Location = new System.Drawing.Point(542, 288);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(74, 13);
             this.label2.TabIndex = 21;
@@ -210,7 +212,7 @@
             this.sourceView.Location = new System.Drawing.Point(12, 40);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(511, 491);
+            this.sourceView.Size = new System.Drawing.Size(446, 491);
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -250,10 +252,10 @@
             this.columnNum,
             this.columnHeader1});
             this.listDisassembly.FullRowSelect = true;
-            this.listDisassembly.Location = new System.Drawing.Point(545, 38);
+            this.listDisassembly.Location = new System.Drawing.Point(480, 40);
             this.listDisassembly.MultiSelect = false;
             this.listDisassembly.Name = "listDisassembly";
-            this.listDisassembly.Size = new System.Drawing.Size(418, 493);
+            this.listDisassembly.Size = new System.Drawing.Size(299, 213);
             this.listDisassembly.TabIndex = 24;
             this.listDisassembly.UseCompatibleStateImageBehavior = false;
             this.listDisassembly.View = System.Windows.Forms.View.Details;
@@ -267,6 +269,16 @@
             // 
             this.columnHeader1.Text = "Disassembly";
             this.columnHeader1.Width = 328;
+            // 
+            // buttonScan
+            // 
+            this.buttonScan.Location = new System.Drawing.Point(182, 29);
+            this.buttonScan.Name = "buttonScan";
+            this.buttonScan.Size = new System.Drawing.Size(90, 23);
+            this.buttonScan.TabIndex = 17;
+            this.buttonScan.Text = "Re-scan";
+            this.buttonScan.UseVisualStyleBackColor = true;
+            this.buttonScan.Click += new System.EventHandler(this.buttonScan_Click);
             // 
             // MainForm
             // 
@@ -316,6 +328,7 @@
         private System.Windows.Forms.ListView listDisassembly;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.ColumnHeader columnNum;
+        private System.Windows.Forms.Button buttonScan;
     }
 }
 
