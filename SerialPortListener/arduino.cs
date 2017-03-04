@@ -17,6 +17,14 @@ namespace ArdDebug
 
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
 
+        private Breakpoint currentBreakpoint = null;
+
+        /// <summary>
+        /// ascii chars used for interaction strings
+        /// (can't use under 128 because normal Serial.print will use them)
+        /// </summary>
+        //public enum Chars : byte { PROGCOUNT_CHAR = 248, TARGET_CHAR, STEPPING_CHAR, ADDRESS_CHAR, DATA_CHAR, NO_CHAR, YES_CHAR };
+
         public class InteractionString
         {
             public int byteCount { get; set; }
@@ -125,6 +133,7 @@ namespace ArdDebug
             }
             int count = 1;
             Breakpoint bp = null;
+            int bpCount = 0;
 
             foreach (string line in File.ReadLines(ShortFilename + ".lss"))
             {
@@ -141,16 +150,21 @@ namespace ArdDebug
                     {
                         string strPC = line.Substring(0, colon);
                         ushort progCounter;
+                        
                         if (ushort.TryParse(strPC, System.Globalization.NumberStyles.HexNumber, null, out progCounter))
                         {
-                            bp.SetDetails(progCounter, line);
-                            Breakpoints.Add(bp);
-                            // find the line in the source view and mark as appropriate
-                            ListView.ListViewItemCollection sourceItems = source.Items;
-                            ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
-                            if (sourceItem != null)
+                            if (++bpCount > 3)// miss out lines before call to qdebug????
                             {
-                                sourceItem.Checked = true;
+                                bp.SetDetails(progCounter, line);
+                                Breakpoints.Add(bp);
+
+                                // find the line in the source view and mark as appropriate
+                                ListView.ListViewItemCollection sourceItems = source.Items;
+                                ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
+                                if (sourceItem != null)
+                                {
+                                    sourceItem.Checked = true;
+                                }
                             }
                             bp = null;
                         }
@@ -161,7 +175,7 @@ namespace ArdDebug
                         };
                     }
                 }
-                if (line.Contains(ShortFilename))
+                if (line.Contains(ShortFilename) ) 
                 {
                     // there should be a debuggable line shortly after, e.g.
                     ////    C: \Users\chris\Documents\Arduino\sketch_feb26a / sketch_feb26a.ino:31
@@ -176,7 +190,7 @@ namespace ArdDebug
                     if (int.TryParse(strSourceLine, out sourceLine))
                     {
                         bp = new Breakpoint(ShortFilename, sourceLine);
-                    }
+                     }
                 }
 
             }
@@ -210,46 +224,75 @@ namespace ArdDebug
             foreach (Breakpoint bp in Breakpoints)
             {
                 if (bp.ProgramCounter == pc)
+                {
+                    currentBreakpoint = bp;
                     return true;
+                }
             }
             return false;
         }
 
-        void UpdateDisassemblyWindow(ushort pc) { 
-            // find a line that starts with [whitespace][pc][:]
-            ListView.ListViewItemCollection disItems = disassembly.Items;
-            string pcStr = pc.ToString("x") + ':';
+        void UpdateCodeWindows(ushort pc) {
             int linecount = 0;
-            foreach (ListViewItem disItem in disItems)
+            if (disassembly.Visible)
+            {
+                // find a line that starts with [whitespace][pc][:]
+                ListView.ListViewItemCollection disItems = disassembly.Items;
+                string pcStr = pc.ToString("x") + ':';
+                linecount = 0;
+                foreach (ListViewItem disItem in disItems)
+                {
+                    ++linecount;
+                    string line = disItem.SubItems[1].Text;
+                    if (line.Contains(pcStr))
+                    {
+                        int index = disItem.Index;
+                        disassembly.Items[index].Selected = true;
+                        disassembly.Select();
+                        disassembly.EnsureVisible(index);
+                        break;
+                    }
+                }
+            }
+            // find the line that contians the current breakpoint
+            ListView.ListViewItemCollection sourceItems = source.Items;
+            linecount = 0;
+            foreach (ListViewItem sourceItem in sourceItems)
             {
                 ++linecount;
-                string line = disItem.SubItems[1].Text;
-                if (line.Contains(pcStr)) {
-                    int index = disItem.Index;
-                    disassembly.Items[index].Selected = true;
-                    disassembly.Select();
-                    disassembly.EnsureVisible(index);
+                //string line = sourceItem.SubItems[2].Text;
+                if (currentBreakpoint != null &&  currentBreakpoint.SourceLine == linecount)
+                {
+                    int index = sourceItem.Index;
+                    source.Items[index].Selected = true;
+                    source.Select();
+                    source.EnsureVisible(index);
                     break;
                 }
             }
-    
+
         }
 
         public string newProgramCounter(InteractionString pcString)
         {
-            ushort nextpc, pc;
+            ushort pc;
+            if (pcString.Content.Length < 5)
+                return null;
             if (ushort.TryParse(pcString.Content.Substring(1,4), System.Globalization.NumberStyles.HexNumber, null, out pc))
             {
-
-                if (pcString.Content.StartsWith("S"))
-                {
+                byte firstChar = (byte)pcString.Content[0];
+                if (firstChar == 'S')
+                //if (firstChar == (char)Chars.STEPPING_CHAR)
+                    {
                     // single-stepping
                     if (AreWeThereYet(pc))
                     {
-                        UpdateDisassemblyWindow(pc);
+                        UpdateCodeWindows(pc);
+                        //return Chars.YES_CHAR.ToString();
                         return "Y";
                     }
                     else
+                        //return Chars.NO_CHAR.ToString();
                         return "N";
 
                     //nextpc = FindNextPC(pc);
@@ -258,7 +301,7 @@ namespace ArdDebug
                 }
                 else
                 {
-                    UpdateDisassemblyWindow(pc);
+                    UpdateCodeWindows(pc);
                 }
             }
             return null;

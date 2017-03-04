@@ -59,7 +59,11 @@ namespace ArdDebug
             if (tbData.TextLength > maxTextLength)
                 tbData.Text = tbData.Text.Remove(0, tbData.TextLength - maxTextLength);
 
-            string str = Encoding.ASCII.GetString(e.Data);
+            string str = Encoding.Default.GetString(e.Data);
+            while (str[0] == '\0')
+            {
+                str = str.Substring(1);
+            }
 
             Arduino.InteractionString buildStr = _arduino.comString;
             tbData.AppendText(str);
@@ -68,21 +72,33 @@ namespace ArdDebug
                 buildStr.Content += str;
                 if (str.Contains("\n"))
                 {
-                    if (buildStr.Content.StartsWith("?"))
-                        buildStr.Content = buildStr.Content.Substring(1);
-                    if (buildStr.Content.Length > 4) { 
-                        if (buildStr.Content.StartsWith("P") )
+                    char firstChar = buildStr.Content[0];
+                    if (buildStr.Content.Length > 4)
+                    {
+                        //if (firstChar == (byte)Arduino.Chars.PROGCOUNT_CHAR) 
+                        if (firstChar == 'P')
                         {
                             string newString = _arduino.newProgramCounter(buildStr);
-                            buildStr.Content = string.Empty;
+                            //buildStr.Content = string.Empty;
                         }
-                        else if ( buildStr.Content.StartsWith("S"))
+                        else if (firstChar == 'S')
                         {
                             string reply = _arduino.newProgramCounter(buildStr);
                             _spManager.Send(reply);
-                            buildStr.Content = string.Empty;
+                            //buildStr.Content = string.Empty;
+                        }
+                        else if (firstChar == 'T')
+                        {
+                            // no reply to send, just info
+                            // but may be followed by 'S..' without a gap. So....
+                            int n = buildStr.Content.IndexOf('\n');
+                            buildStr.Content = buildStr.Content.Substring(n + 1);
+                            string reply = _arduino.newProgramCounter(buildStr);
+                            _spManager.Send(reply);
+
                         }
                     }
+                    buildStr.Content = string.Empty;
                 }
 
             }
@@ -105,18 +121,6 @@ namespace ArdDebug
         private void buttonSend_Click(object sender, EventArgs e)
         {
             string message = this.textToSend.Text + '\n';
-            //byte[] hexToSend = new byte[3];
-            ushort progCounter = 0;
-            //if (ushort.TryParse(message.Substring(1), System.Globalization.NumberStyles.HexNumber, null, out progCounter))
-            //{
-            //    // sending a new address, in hex. Convert to two-byte array instead, to avoid Arduino having to deal with atoi() in hex
-            //    hexToSend[0] = (byte) message[0];
-            //    hexToSend[1] = (byte) (progCounter / 256);
-            //    hexToSend[2] = (byte)(progCounter % 256);
-            //    _spManager.Send(hexToSend);
-            //}
-
-            //else
             {
                 _spManager.Send(message);
             }
