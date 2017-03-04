@@ -11,11 +11,29 @@ namespace ArdDebug
     class Arduino
     {
 
-        private ListView source,disassembly;
+        private ListView source, disassembly;
         public String ShortFilename { private set; get; }
         public String FullFilename { private set; get; }
 
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
+
+        public class InteractionString
+        {
+            public int byteCount { get; set; }
+            public int messageLength { get; set; }
+            public ushort RecvdNumber { get; set; }
+
+            public string Content { get;  set; }
+            public InteractionString()
+            {
+                byteCount = 0;
+                messageLength = 0;
+                Content = string.Empty;
+                RecvdNumber = 0;
+            }
+        }
+        public InteractionString comString;
+
 
         private bool openSourceFile()
         {
@@ -107,17 +125,17 @@ namespace ArdDebug
             }
             int count = 1;
             Breakpoint bp = null;
-            
+
             foreach (string line in File.ReadLines(ShortFilename + ".lss"))
             {
                 ListViewItem lvi = new ListViewItem();
                 lvi.Text = (count++).ToString();
                 lvi.SubItems.Add(line.Replace("\t", "    "));
                 disassembly.Items.Add(lvi);
-                
+
                 if (bp != null)
                 {
-                    // in the middle of breakpoint parse. Find the line containing te debug info (see below)
+                    // in the middle of breakpoint parse. Find the line containing the debug info (see below)
                     int colon = line.LastIndexOf(':');
                     if (colon >= 0 && colon < 12) // to avoid colons in comments etc
                     {
@@ -129,11 +147,11 @@ namespace ArdDebug
                             Breakpoints.Add(bp);
                             // find the line in the source view and mark as appropriate
                             ListView.ListViewItemCollection sourceItems = source.Items;
-                            ListViewItem sourceItem = sourceItems[bp.SourceLine-1];
+                            ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
                             if (sourceItem != null)
                             {
                                 sourceItem.Checked = true;
-                            }                            
+                            }
                             bp = null;
                         }
                         else
@@ -160,11 +178,11 @@ namespace ArdDebug
                         bp = new Breakpoint(ShortFilename, sourceLine);
                     }
                 }
-                
+
             }
             if (disassembly.Items.Count < 3)
             {
-                MessageBox.Show("error with disaassembly listing");
+                MessageBox.Show("error with disassembly listing");
                 return false;
             }
             return true;
@@ -176,11 +194,75 @@ namespace ArdDebug
         /// </summary>
         /// <param name="pc">pc at current breakpoint</param>
         /// <returns>next pc to pause execution</returns>
-        //public ushort FindNextPC(ushort pc)
-        //{
-          
+        public ushort FindNextPC(ushort pc)
+        {
+            // placeholder only for now
+            return pc;
 
-        //}
+        }
+
+        /// <summary>
+        /// use the list of breakpoint-able lines to determine if we are at the next place to 'single-step' to
+        /// </summary>
+        /// <param name="pc">pc at current breakpoint</param>
+        public bool AreWeThereYet(ushort pc)
+        {
+            foreach (Breakpoint bp in Breakpoints)
+            {
+                if (bp.ProgramCounter == pc)
+                    return true;
+            }
+            return false;
+        }
+
+        void UpdateDisassemblyWindow(ushort pc) { 
+            // find a line that starts with [whitespace][pc][:]
+            ListView.ListViewItemCollection disItems = disassembly.Items;
+            string pcStr = pc.ToString("x") + ':';
+            int linecount = 0;
+            foreach (ListViewItem disItem in disItems)
+            {
+                ++linecount;
+                string line = disItem.SubItems[1].Text;
+                if (line.Contains(pcStr)) {
+                    int index = disItem.Index;
+                    disassembly.Items[index].Selected = true;
+                    disassembly.Select();
+                    disassembly.EnsureVisible(index);
+                    break;
+                }
+            }
+    
+        }
+
+        public string newProgramCounter(InteractionString pcString)
+        {
+            ushort nextpc, pc;
+            if (ushort.TryParse(pcString.Content.Substring(1,4), System.Globalization.NumberStyles.HexNumber, null, out pc))
+            {
+
+                if (pcString.Content.StartsWith("S"))
+                {
+                    // single-stepping
+                    if (AreWeThereYet(pc))
+                    {
+                        UpdateDisassemblyWindow(pc);
+                        return "Y";
+                    }
+                    else
+                        return "N";
+
+                    //nextpc = FindNextPC(pc);
+                    //string newString = nextpc.ToString("X");
+                    //return newString;
+                }
+                else
+                {
+                    UpdateDisassemblyWindow(pc);
+                }
+            }
+            return null;
+        }
 
 
         public bool OpenFiles(ListView source, ListView disassembly)

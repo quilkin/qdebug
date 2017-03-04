@@ -35,6 +35,7 @@
             this.serialSettingsBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.portNameComboBox = new System.Windows.Forms.ComboBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.buttonScan = new System.Windows.Forms.Button();
             this.btnStart = new System.Windows.Forms.Button();
             this.tbData = new System.Windows.Forms.TextBox();
             this.btnStop = new System.Windows.Forms.Button();
@@ -53,7 +54,6 @@
             this.listDisassembly = new System.Windows.Forms.ListView();
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.buttonScan = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             portNameLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
@@ -110,6 +110,16 @@
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "COM Settings (must be same as your sketch)";
+            // 
+            // buttonScan
+            // 
+            this.buttonScan.Location = new System.Drawing.Point(182, 29);
+            this.buttonScan.Name = "buttonScan";
+            this.buttonScan.Size = new System.Drawing.Size(90, 23);
+            this.buttonScan.TabIndex = 17;
+            this.buttonScan.Text = "Re-scan";
+            this.buttonScan.UseVisualStyleBackColor = true;
+            this.buttonScan.Click += new System.EventHandler(this.buttonScan_Click);
             // 
             // btnStart
             // 
@@ -252,6 +262,7 @@
             this.columnNum,
             this.columnHeader1});
             this.listDisassembly.FullRowSelect = true;
+            this.listDisassembly.HideSelection = false;
             this.listDisassembly.Location = new System.Drawing.Point(480, 40);
             this.listDisassembly.MultiSelect = false;
             this.listDisassembly.Name = "listDisassembly";
@@ -269,16 +280,6 @@
             // 
             this.columnHeader1.Text = "Disassembly";
             this.columnHeader1.Width = 328;
-            // 
-            // buttonScan
-            // 
-            this.buttonScan.Location = new System.Drawing.Point(182, 29);
-            this.buttonScan.Name = "buttonScan";
-            this.buttonScan.Size = new System.Drawing.Size(90, 23);
-            this.buttonScan.TabIndex = 17;
-            this.buttonScan.Text = "Re-scan";
-            this.buttonScan.UseVisualStyleBackColor = true;
-            this.buttonScan.Click += new System.EventHandler(this.buttonScan_Click);
             // 
             // MainForm
             // 

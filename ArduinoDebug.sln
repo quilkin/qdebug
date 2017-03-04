@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArduinoDebug", "SerialPortListener\ArduinoDebug.csproj", "{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "qdebugtest", "..\..\..\Arduino\qdebugtest\qdebugtest.vcxproj", "{388DE1CE-F676-41DE-A134-05B6BC5038F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -15,6 +17,10 @@ Global
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Debug|x86.Build.0 = Debug|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Release|x86.ActiveCfg = Release|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Release|x86.Build.0 = Release|x86
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x86.ActiveCfg = Debug|Win32
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x86.Build.0 = Debug|Win32
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.ActiveCfg = Release|Win32
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

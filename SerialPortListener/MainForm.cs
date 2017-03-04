@@ -15,9 +15,7 @@ namespace ArdDebug
     {
         SerialPortManager _spManager;
         Arduino _arduino;
-        private int byteCount = 0;
-        private ulong recvdNumber = 0;
-        private int messageLength = 0;
+
 
         public MainForm()
         {
@@ -62,66 +60,40 @@ namespace ArdDebug
                 tbData.Text = tbData.Text.Remove(0, tbData.TextLength - maxTextLength);
 
             string str = Encoding.ASCII.GetString(e.Data);
+
+            Arduino.InteractionString buildStr = _arduino.comString;
             tbData.AppendText(str);
-            //if (str.EndsWith("\n"))
-            //{
-            //    tbData.AppendText("\r\n");
-            //}
-            //if (e.Data.Length != 5 && e.Data.Length != 9)
-            //{
-            //    // rubbish, ignore but print details
-            //    tbData.AppendText("?data length = " + e.Data.Length);
-            //    tbData.AppendText(" ?");
-            //    string str = Encoding.ASCII.GetString(e.Data);
-            //    tbData.AppendText(str);
-            //    tbData.AppendText("\r\n");
-            //    return;
-            //}
-            //foreach (byte b in e.Data)
-            //{
-            //    if (e.Data.Length == 1)
-            //    {
-            //        if (byteCount == 0)
-            //        {
-            //            messageLength = e.Data[0];
-            //            //recvdNumber = (ushort)((e.Data[0] << 8));
-            //            tbData.AppendText(messageLength.ToString() + ": ");
-            //            ++byteCount;
-            //        }
-            //        else if (byteCount <= messageLength)
-            //        {
-            //            recvdNumber *= 256;
-            //            recvdNumber += (e.Data[0]);
+            if (buildStr != null)
+            {
+                buildStr.Content += str;
+                if (str.Contains("\n"))
+                {
+                    if (buildStr.Content.StartsWith("?"))
+                        buildStr.Content = buildStr.Content.Substring(1);
+                    if (buildStr.Content.Length > 4) { 
+                        if (buildStr.Content.StartsWith("P") )
+                        {
+                            string newString = _arduino.newProgramCounter(buildStr);
+                            buildStr.Content = string.Empty;
+                        }
+                        else if ( buildStr.Content.StartsWith("S"))
+                        {
+                            string reply = _arduino.newProgramCounter(buildStr);
+                            _spManager.Send(reply);
+                            buildStr.Content = string.Empty;
+                        }
+                    }
+                }
 
-            //            if (++byteCount > messageLength)
-            //            {
-            //                if (messageLength == 2)
-            //                    tbData.AppendText(recvdNumber.ToString("04X"));
-            //                else
-            //                    tbData.AppendText(recvdNumber.ToString("08X"));
-            //                byteCount = 0;
-            //                recvdNumber = 0;
-            //                tbData.AppendText("\r\n");
-            //            }
+            }
 
-            //        }
-            //    }
-
-            //}
-
-            //ushort nextpc,pc;
-            //if (ushort.TryParse(pcString, out pc))
-            //{
-            //    nextpc = _arduino.FindNextPC(pc);
-            //    pcString = nextpc.ToString("X");
-            //    _spManager.Send(pcString);
-            //}
         }
 
         // Handles the "Start Listening"-buttom click event
         private void btnStart_Click(object sender, EventArgs e)
         {
             _spManager.StartListening();
+            _arduino.comString = new Arduino.InteractionString();
         }
 
         // Handles the "Stop Listening"-buttom click event

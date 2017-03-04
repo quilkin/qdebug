@@ -61,7 +61,8 @@ namespace ArdDebug
             string[] parts = line.Split(delimiters,StringSplitOptions.RemoveEmptyEntries);
 
             OpCode = parts[1] + parts[2];
-            Assembler = parts[3 ] + " " +parts[4];
+            Assembler = parts[3];
+            if (parts.Length > 4) Assembler += (" " +parts[4]);
 
         }
 
