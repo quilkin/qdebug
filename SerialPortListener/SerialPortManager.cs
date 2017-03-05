@@ -7,23 +7,44 @@ using System.Reflection;
 using System.ComponentModel;
 using System.Threading;
 using System.IO;
+using System.Management;
 
 namespace ArdDebug.Serial
 {
+
+
     /// <summary>
     /// Manager for serial port data
     /// </summary>
     public class SerialPortManager : IDisposable
     {
+        class USBDeviceInfo
+        {
+            //public USBDeviceInfo(string deviceID, string pnpDeviceID, string description, string name)
+            public USBDeviceInfo(string deviceID, string name)
+            {
+                this.DeviceID = deviceID;
+                //this.PnpDeviceID = pnpDeviceID;
+                //this.Description = description;
+                this.Name = name;
+            }
+            public string DeviceID { get; private set; }
+            //public string PnpDeviceID { get; private set; }
+            //public string Description { get; private set; }
+            public string Name { get; private set; }
+        }
+
         public SerialPortManager()
         {
-            // Finding installed serial ports on hardware
-            _currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
             _currentSerialSettings.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(_currentSerialSettings_PropertyChanged);
+            ScanPorts();
+            //// Finding installed serial ports on hardware
+            //_currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
+            
 
-            // If serial ports is found, we select the first found
-            if (_currentSerialSettings.PortNameCollection.Length > 0)
-                _currentSerialSettings.PortName = _currentSerialSettings.PortNameCollection[0];
+            //// If serial ports is found, we select the first found
+            //if (_currentSerialSettings.PortNameCollection.Length > 0)
+            //    _currentSerialSettings.PortName = _currentSerialSettings.PortNameCollection[0];
         }
 
         
@@ -32,13 +53,51 @@ namespace ArdDebug.Serial
             Dispose(false);
         }
 
-        public void ReScan()
+
+        public void ScanPorts()
         {
-            // Finding installed serial ports on hardware
-            _currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
-            // If serial ports is found, we select the first found
-            if (_currentSerialSettings.PortNameCollection.Length > 0)
-                _currentSerialSettings.PortName = _currentSerialSettings.PortNameCollection[0];
+            // find USB devices first, if possible (may not work with all Windows machines....!)
+            string ArduinoPort = null;
+            try
+            {
+                List<USBDeviceInfo> devices = new List<USBDeviceInfo>();
+                var searcher = new ManagementObjectSearcher(@"Select * From Win32_SerialPort");
+
+
+                foreach (var device in searcher.Get())
+                {
+                    //devices.Add(new USBDeviceInfo(
+                    USBDeviceInfo usbInfo = new USBDeviceInfo(
+                    (string)device.GetPropertyValue("DeviceID"),
+                    //(string)device.GetPropertyValue("PNPDeviceID"),
+                    //(string)device.GetPropertyValue("Description"),
+                    //(string)device.GetPropertyValue("Name")
+                    //));
+                    (string)device.GetPropertyValue("Name")
+                    );
+                    if (usbInfo.Name.Contains("rduino"))
+                    {
+                        ArduinoPort = usbInfo.DeviceID;
+                    }
+                }
+            }
+            catch
+            { // well at leat we tried....
+            }
+
+
+            if (ArduinoPort != null)
+            {
+                _currentSerialSettings.PortName = ArduinoPort;
+            }
+            else
+            {
+                // Finding installed serial ports on hardware
+                _currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
+                // If serial ports is found, we select the first found
+                if (_currentSerialSettings.PortNameCollection.Length > 0)
+                    _currentSerialSettings.PortName = _currentSerialSettings.PortNameCollection[0];
+            }
         }
 
         #region Fields

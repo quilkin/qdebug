@@ -75,9 +75,9 @@
             portNameLabel.AutoSize = true;
             portNameLabel.Location = new System.Drawing.Point(10, 32);
             portNameLabel.Name = "portNameLabel";
-            portNameLabel.Size = new System.Drawing.Size(69, 13);
+            portNameLabel.Size = new System.Drawing.Size(105, 13);
             portNameLabel.TabIndex = 7;
-            portNameLabel.Text = "Port Number:";
+            portNameLabel.Text = "Arduino connection: ";
             // 
             // baudRateComboBox
             // 
@@ -92,7 +92,7 @@
             // 
             this.portNameComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "PortName", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.portNameComboBox.FormattingEnabled = true;
-            this.portNameComboBox.Location = new System.Drawing.Point(77, 29);
+            this.portNameComboBox.Location = new System.Drawing.Point(121, 29);
             this.portNameComboBox.Name = "portNameComboBox";
             this.portNameComboBox.Size = new System.Drawing.Size(96, 21);
             this.portNameComboBox.TabIndex = 8;
@@ -106,16 +106,16 @@
             this.groupBox1.Controls.Add(portNameLabel);
             this.groupBox1.Location = new System.Drawing.Point(11, 14);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(282, 86);
+            this.groupBox1.Size = new System.Drawing.Size(343, 86);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "COM Settings (must be same as your sketch)";
             // 
             // buttonScan
             // 
-            this.buttonScan.Location = new System.Drawing.Point(182, 29);
+            this.buttonScan.Location = new System.Drawing.Point(223, 27);
             this.buttonScan.Name = "buttonScan";
-            this.buttonScan.Size = new System.Drawing.Size(90, 23);
+            this.buttonScan.Size = new System.Drawing.Size(71, 23);
             this.buttonScan.TabIndex = 17;
             this.buttonScan.Text = "Re-scan";
             this.buttonScan.UseVisualStyleBackColor = true;
@@ -125,9 +125,9 @@
             // 
             this.btnStart.Location = new System.Drawing.Point(11, 106);
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(85, 23);
+            this.btnStart.Size = new System.Drawing.Size(102, 23);
             this.btnStart.TabIndex = 12;
-            this.btnStart.Text = "Start listening";
+            this.btnStart.Text = "Start / Reset";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
             // 
@@ -147,15 +147,15 @@
             // 
             this.btnStop.Location = new System.Drawing.Point(11, 135);
             this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(85, 23);
+            this.btnStop.Size = new System.Drawing.Size(102, 23);
             this.btnStop.TabIndex = 12;
-            this.btnStop.Text = "Stop listening";
+            this.btnStop.Text = "Close connection";
             this.btnStop.UseVisualStyleBackColor = true;
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
             // 
             // buttonSend
             // 
-            this.buttonSend.Location = new System.Drawing.Point(102, 135);
+            this.buttonSend.Location = new System.Drawing.Point(264, 135);
             this.buttonSend.Name = "buttonSend";
             this.buttonSend.Size = new System.Drawing.Size(90, 23);
             this.buttonSend.TabIndex = 15;
@@ -165,7 +165,7 @@
             // 
             // textToSend
             // 
-            this.textToSend.Location = new System.Drawing.Point(102, 109);
+            this.textToSend.Location = new System.Drawing.Point(264, 106);
             this.textToSend.MaxLength = 32;
             this.textToSend.Name = "textToSend";
             this.textToSend.Size = new System.Drawing.Size(90, 20);
@@ -186,9 +186,9 @@
             // 
             // varView
             // 
-            this.varView.Location = new System.Drawing.Point(532, 324);
+            this.varView.Location = new System.Drawing.Point(480, 288);
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(185, 191);
+            this.varView.Size = new System.Drawing.Size(299, 227);
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             // 
@@ -204,7 +204,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(542, 288);
+            this.label2.Location = new System.Drawing.Point(477, 272);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(74, 13);
             this.label2.TabIndex = 21;
@@ -248,9 +248,9 @@
             // 
             // buttonLoad
             // 
-            this.buttonLoad.Location = new System.Drawing.Point(503, 9);
+            this.buttonLoad.Location = new System.Drawing.Point(480, 10);
             this.buttonLoad.Name = "buttonLoad";
-            this.buttonLoad.Size = new System.Drawing.Size(135, 23);
+            this.buttonLoad.Size = new System.Drawing.Size(299, 23);
             this.buttonLoad.TabIndex = 23;
             this.buttonLoad.Text = "Load Sketch";
             this.buttonLoad.UseVisualStyleBackColor = true;

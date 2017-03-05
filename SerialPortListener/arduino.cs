@@ -17,7 +17,7 @@ namespace ArdDebug
 
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
 
-        private Breakpoint currentBreakpoint = null;
+        public Breakpoint currentBreakpoint = null;
 
         /// <summary>
         /// ascii chars used for interaction strings
@@ -254,9 +254,12 @@ namespace ArdDebug
                     }
                 }
             }
-            // find the line that contians the current breakpoint
+            if (source == null)
+                return;
+            // find the line that contains the current breakpoint
             ListView.ListViewItemCollection sourceItems = source.Items;
             linecount = 0;
+            bool lineFound = false;
             foreach (ListViewItem sourceItem in sourceItems)
             {
                 ++linecount;
@@ -267,8 +270,14 @@ namespace ArdDebug
                     source.Items[index].Selected = true;
                     source.Select();
                     source.EnsureVisible(index);
+                    lineFound = true;
                     break;
                 }
+            }
+            if (!lineFound)
+            {
+                source.Items[0].Selected = true;
+                source.EnsureVisible(0);
             }
 
         }

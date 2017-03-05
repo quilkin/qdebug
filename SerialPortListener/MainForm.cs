@@ -60,10 +60,13 @@ namespace ArdDebug
                 tbData.Text = tbData.Text.Remove(0, maxTextLength/2);
 
             string str = Encoding.Default.GetString(e.Data);
-            while (str[0] == '\0')
+            while (str.Length > 0 && str[0] == '\0')
             {
-                str = str.Substring(1);
+                    str = str.Substring(1);
+
             }
+            if (str.Length == 0)
+                return;
 
             Arduino.InteractionString buildStr = _arduino.comString;
             tbData.AppendText(str);
@@ -122,8 +125,15 @@ namespace ArdDebug
         // Handles the "Start Listening"-buttom click event
         private void btnStart_Click(object sender, EventArgs e)
         {
+            if (listDisassembly.Items.Count < 10)
+            {
+                MessageBox.Show("Must open your Arduino sketch first!");
+                this.buttonLoad.Select();
+                return;
+            }
             _spManager.StartListening();
             _arduino.comString = new Arduino.InteractionString();
+            _arduino.currentBreakpoint = null;
         }
 
         // Handles the "Stop Listening"-buttom click event
@@ -163,7 +173,7 @@ namespace ArdDebug
 
         private void buttonScan_Click(object sender, EventArgs e)
         {
-            _spManager.ReScan();
+            _spManager.ScanPorts();
             portNameComboBox.DataSource = _spManager.CurrentSerialSettings.PortNameCollection;
             portNameComboBox.Update();
         }
