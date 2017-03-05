@@ -57,7 +57,7 @@ namespace ArdDebug
 
             int maxTextLength = 1000; // maximum text length in text box
             if (tbData.TextLength > maxTextLength)
-                tbData.Text = tbData.Text.Remove(0, tbData.TextLength - maxTextLength);
+                tbData.Text = tbData.Text.Remove(0, maxTextLength/2);
 
             string str = Encoding.Default.GetString(e.Data);
             while (str[0] == '\0')
@@ -69,9 +69,25 @@ namespace ArdDebug
             tbData.AppendText(str);
             if (buildStr != null)
             {
+
                 buildStr.Content += str;
-                if (str.Contains("\n"))
+
+                //if (buildStr.Content.Contains("num"))
+                //{
+                //    buildStr.Content = "num";
+                //}
+                if (buildStr.Content.Contains("\n"))
                 {
+                    // two messages may be concatenated
+                    string[] split = null;
+                    if (buildStr.Content.IndexOf('\n') < buildStr.Content.Length - 1)
+                    {
+                        split = buildStr.Content.Split('\n');
+                        if (split.Length > 1)
+                        {
+                            buildStr.Content = split[0];
+                        }
+                    }
                     char firstChar = buildStr.Content[0];
                     if (buildStr.Content.Length > 4)
                     {
@@ -90,15 +106,13 @@ namespace ArdDebug
                         else if (firstChar == 'T')
                         {
                             // no reply to send, just info
-                            // but may be followed by 'S..' without a gap. So....
-                            int n = buildStr.Content.IndexOf('\n');
-                            buildStr.Content = buildStr.Content.Substring(n + 1);
-                            string reply = _arduino.newProgramCounter(buildStr);
-                            _spManager.Send(reply);
 
                         }
                     }
-                    buildStr.Content = string.Empty;
+                    if (split != null && split.Length > 1)
+                        buildStr.Content = split[1];
+                    else
+                        buildStr.Content = string.Empty;
                 }
 
             }

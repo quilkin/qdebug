@@ -91,7 +91,7 @@ namespace ArdDebug.Serial
         public void Send(string s)
         {
             //s += '\n';
-            if (_serialPort != null && _serialPort.IsOpen)
+            if (_serialPort != null && _serialPort.IsOpen && s != null)
             {
                 _serialPort.Write(s);
             }

@@ -153,7 +153,7 @@ namespace ArdDebug
                         
                         if (ushort.TryParse(strPC, System.Globalization.NumberStyles.HexNumber, null, out progCounter))
                         {
-                            if (++bpCount > 3)// miss out lines before call to qdebug????
+                            if (++bpCount > 1)// miss out lines before call to qdebug????
                             {
                                 bp.SetDetails(progCounter, line);
                                 Breakpoints.Add(bp);
@@ -234,7 +234,7 @@ namespace ArdDebug
 
         void UpdateCodeWindows(ushort pc) {
             int linecount = 0;
-            if (disassembly.Visible)
+            if (disassembly != null && disassembly.Visible)
             {
                 // find a line that starts with [whitespace][pc][:]
                 ListView.ListViewItemCollection disItems = disassembly.Items;

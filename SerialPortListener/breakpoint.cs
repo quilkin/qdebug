@@ -10,7 +10,7 @@ namespace ArdDebug
     {
 
         public ushort ProgramCounter   { get; set; }
-        public string OpCode           { get; set; }
+        public UInt32 OpCode           { get; set; }
         public string Assembler        { get; set; }
         /// <summary>
         /// The source file that this breakpoint lies in
@@ -26,7 +26,7 @@ namespace ArdDebug
         /// </summary>
         public bool Manual            { get; set; }
 
-        Breakpoint(ushort pc, string op, string ass, string f, string func)
+        Breakpoint(ushort pc, UInt32 op, string ass, string f, string func)
         {
             ProgramCounter = pc;
             OpCode = op;
@@ -40,12 +40,12 @@ namespace ArdDebug
             File = f;
             SourceLine = source;
             ProgramCounter = 0;
-            OpCode = "";
+            OpCode = 0;
             Assembler = "";
              Function = "";
             Manual = false;
         }
-        public void SetDetails(ushort pc, string op, string ass, string func)
+        public void SetDetails(ushort pc, UInt32 op, string ass, string func)
         {
             ProgramCounter = pc;
             OpCode = op;
@@ -55,14 +55,47 @@ namespace ArdDebug
         public void SetDetails(ushort pc, string line)
         {
             // we have a line that looks like this:
+            ////      520:	8f 92       	push	r8
+            // or like
             ////      790:	1e 82       	std	Y+6, r1	; 0x06
+            // or like
+            ////      40c:	0e 94 f2 01 	call	0x3e4	; 0x3e4 <millis>
             ProgramCounter = pc;
             char[] delimiters = new char[] { '\t', ' ' };
             string[] parts = line.Split(delimiters,StringSplitOptions.RemoveEmptyEntries);
 
-            OpCode = parts[1] + parts[2];
-            Assembler = parts[3];
-            if (parts.Length > 4) Assembler += (" " +parts[4]);
+            bool opcodeDone = false;
+            OpCode = 0;
+            Assembler = string.Empty;
+            foreach (string part in parts)
+            {
+                if (part.EndsWith(":"))
+                {
+                    continue; // we have pc already
+                }
+                if (part == ";")
+                {
+                    //ignore comments
+                    break;
+                }
+                if (!opcodeDone)
+                {
+                    ushort codebyte;
+                    if (ushort.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out codebyte))
+                    {
+                        OpCode = (OpCode << 8) + codebyte;
+                    }
+                    else
+                    {
+                        opcodeDone = true;
+                    }
+                }
+                if (opcodeDone)
+                {
+                    Assembler += (part + " ");
+                }
+
+            }
 
         }
 
