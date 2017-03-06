@@ -16,6 +16,13 @@ namespace ArdDebug
         public String FullFilename { private set; get; }
 
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
+        private List<Variable> Variables = new List<Variable>();
+        private List<VariableType> VariableTypes = new List<VariableType>();
+        /// <summary>
+        /// variable names found by parsing the assembler file, included in our own source files
+        /// Just used for comaprison when parsing full list of variables which contain eveything
+        /// </summary>
+        private List<String> MyVariables = new List<String>();
 
         public Breakpoint currentBreakpoint = null;
 
@@ -74,35 +81,8 @@ namespace ArdDebug
             return false;
         }
 
-        private bool OpenDisassembly()
+        private bool doObjDump(ProcessStartInfo startInfo, string fileExt)
         {
-            // find the .elf file corresponding to this sketch
-            string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
-            string elfPath = null;
-            bool found = false;
-            foreach (string path in arduinoPaths)
-            {
-                elfPath = path + "\\" + ShortFilename + ".elf";
-                if (File.Exists(elfPath))
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                MessageBox.Show("No compiled files found. You may need to recomplie your project");
-                return false;
-            }
-            // Use ProcessStartInfo class
-            // objdump - d progcount2.ino.elf > progcount2.ino.lss
-            ProcessStartInfo startInfo = new ProcessStartInfo();
-            startInfo.CreateNoWindow = false;
-            startInfo.UseShellExecute = false;
-            startInfo.FileName = "objdump.exe";
-            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-            startInfo.Arguments = "-d -S -l -t -C " + elfPath;
-            startInfo.RedirectStandardOutput = true;
 
             try
             {
@@ -110,7 +90,7 @@ namespace ArdDebug
                 // Call WaitForExit and then the using statement will close.
                 using (Process exeProcess = Process.Start(startInfo))
                 {
-                    using (StreamWriter writer = File.CreateText(ShortFilename + ".lss"))
+                    using (StreamWriter writer = File.CreateText(ShortFilename + fileExt))
                     using (StreamReader reader = exeProcess.StandardOutput)
                     {
                         writer.AutoFlush = true;
@@ -131,11 +111,171 @@ namespace ArdDebug
                 MessageBox.Show(ex.Message);
                 return false;
             }
+            return true;
+        }
+
+
+
+        private bool ParseDebugInfo(string file)
+        {
+            Variable var = null;
+            VariableType varType = null;
+
+            // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
+
+            foreach (string line in File.ReadLines(file))
+            {
+                // first of all need to find a list of variable types used. Info is in this format:
+                //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
+                //  <6c9>   DW_AT_byte_size   : 2
+                //  <6ca>   DW_AT_encoding    : 5	(signed)
+                //  <6cb>   DW_AT_name        : int
+                if (varType != null)
+                {
+                    // found something in the previous line
+
+                    if (line.Contains("DW_AT_byte_size"))
+                    {
+                        int index = line.LastIndexOf(':');
+                        int size = 0;
+                        if (int.TryParse(line.Substring(index + 1), out size))
+                        {
+                            varType.Size = size;
+                        }
+                    }
+                    else if (line.Contains("DW_AT_encoding"))
+                    {
+                        int index = line.LastIndexOf(':');
+                        int enc = 0;
+                        string encStr = line.Substring(index+2,1); // but not 100% sure if these are all < 16 i..e one digit
+                        if (int.TryParse(encStr, out enc))
+                        {
+                            varType.Encoding = enc;
+                            varType.EncodingString = line.Substring(index + 4);
+
+                        }
+                        else
+                        {
+                            MessageBox.Show("error parsing variable types.." + line);
+                        }
+                    }
+                    else if (line.Contains("DW_AT_name"))
+                    {
+                        int index = line.LastIndexOf(':');
+                        varType.Name = line.Substring(index + 1).Trim();
+                        //VariableTypes.Add(varType);
+                        //varType = null;
+                    }
+
+                }
+                if (line.Contains("DW_TAG_base_type"))
+                {
+                    //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
+                    int index1 = line.LastIndexOf('<');
+                    int index2 = line.LastIndexOf('>');
+                    UInt16 reference = 0;
+                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                    {
+                        varType = new VariableType(reference);
+                    }
+                    else
+                    {
+                        MessageBox.Show("error parsing variable types.." + line);
+                    }
+                }
+                else if (line.Contains("Abbrev Number"))
+                {
+                    // done with previous definition
+                    if (varType != null)
+                        VariableTypes.Add(varType);
+                    varType = null;
+                }
+            }
+
+            // now find the variables themselves
+            foreach (string line in File.ReadLines(file))
+            {
+                //// looking for info like this, to find location of our variables ('numf' is a global in this example)
+                //< 1 >< 1fa7 >: Abbrev Number: 78(DW_TAG_variable)
+                //  < 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): numf
+                //  < 1fac > DW_AT_decl_file   : 7
+                //  < 1fad > DW_AT_decl_line   : 9
+                //  < 1fae > DW_AT_type        : < 0x1fb8 >
+                //  < 1fb2 > DW_AT_location    : 5 byte block: 3 0 1 80 0(DW_OP_addr: 800100)
+                if (var != null)
+                {
+                    // found something in the previous line
+                    if (line.Contains("DW_AT_name"))
+                    {
+                        int index = line.LastIndexOf(':');
+                        String name = line.Substring(index + 1).Trim();
+                        // We're only interested in vars that occur in our own files, not library files
+                        // Also, only global vars for now.
+                        if (MyVariables.Contains(name))
+                        {
+                            var.Name = name;
+                        }
+                        else
+                        {
+                            var = null;  // ignore and get ready for next one
+                        }
+
+                    }
+                    else if (line.Contains("DW_AT_type"))
+                    {
+                        int index1 = line.LastIndexOf('<');
+                        int index2 = line.LastIndexOf('>');
+                        UInt16 typeRef = 0;
+                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
+                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out typeRef))
+                        {
+                            var.Type = VariableTypes.Find(x => x.Reference == typeRef);
+                        }
+                        else
+                        {
+                            MessageBox.Show("error parsing variables..." + line);
+                        }
+                    }
+                    else if (line.Contains("DW_AT_location"))
+                    {
+                        if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_stack_value"))
+                        {
+                            // local or register var, not dealing with these yet
+                            var = null;  // get ready for next one
+                            continue;
+
+                        }
+                        int index1 = line.LastIndexOf(':');
+                        int index2 = line.LastIndexOf(')');
+                        UInt32 loc = 0;
+                        string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                        if (uint.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
+                        {
+                            var.Address = (ushort)(loc & 0xFFFF);
+                            Variables.Add(var);
+                            var = null;  // get ready for next one
+                        }
+                        else
+                        {
+                            MessageBox.Show("error parsing variables..." + line);
+                        }
+                    }
+                }
+                if (line.Contains("DW_TAG_variable"))
+                {
+                    var = new Variable();
+                }
+            }
+            return true;
+        }
+        private bool ParseDisassembly(string file)
+        {
             int count = 1;
             Breakpoint bp = null;
             int bpCount = 0;
 
-            foreach (string line in File.ReadLines(ShortFilename + ".lss"))
+            foreach (string line in File.ReadLines(file))
             {
                 ListViewItem lvi = new ListViewItem();
                 lvi.Text = (count++).ToString();
@@ -150,7 +290,7 @@ namespace ArdDebug
                     {
                         string strPC = line.Substring(0, colon);
                         ushort progCounter;
-                        
+
                         if (ushort.TryParse(strPC, System.Globalization.NumberStyles.HexNumber, null, out progCounter))
                         {
                             if (++bpCount > 1)// miss out lines before call to qdebug????
@@ -174,8 +314,35 @@ namespace ArdDebug
                             MessageBox.Show("confusing debug line? " + line);
                         };
                     }
+                    else
+                    {
+                        // see if there are any variables declared here
+                        // looking for something like "  int locali = iii*3;"
+                        // or                        "unsigned int ms = 0;"
+                        // but not if there's a function definition here
+                        // and not an assignment e.g. " ms = 3;"
+                        int equals = line.IndexOf('=');
+                        int bracket = line.IndexOf('(');
+                        if (bracket < 0 && equals > 0)
+                        {
+                            // should be a variable declaration. Might be local (deal with that later.....)
+                            char[] delimiters = new char[] { ' ' };
+                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length < 4)
+                                continue;           // not a declaration
+                            if (parts[1] == "=")
+                                continue;  // not a declaration
+                            string varName = null; 
+                            if (parts[2]=="=")
+                                varName = parts[1];
+                            else if (parts[3]=="=")
+                                varName = parts[2];
+                            if (varName != null)
+                                MyVariables.Add(varName);
+                        }
+                    }
                 }
-                if (line.Contains(ShortFilename) ) 
+                if (line.Contains(ShortFilename))
                 {
                     // there should be a debuggable line shortly after, e.g.
                     ////    C: \Users\chris\Documents\Arduino\sketch_feb26a / sketch_feb26a.ino:31
@@ -190,7 +357,7 @@ namespace ArdDebug
                     if (int.TryParse(strSourceLine, out sourceLine))
                     {
                         bp = new Breakpoint(ShortFilename, sourceLine);
-                     }
+                    }
                 }
 
             }
@@ -199,6 +366,57 @@ namespace ArdDebug
                 MessageBox.Show("error with disassembly listing");
                 return false;
             }
+            return true;
+        }
+        private bool OpenDisassembly()
+        {
+            // find the .elf file corresponding to this sketch
+            string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
+            string elfPath = null;
+            bool found = false;
+            foreach (string path in arduinoPaths)
+            {
+                elfPath = path + "\\" + ShortFilename + ".elf";
+                if (File.Exists(elfPath))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                MessageBox.Show("No compiled files found. You may need to recompile your project");
+                return false;
+            }
+            // Use ProcessStartInfo class
+            // objdump - d progcount2.ino.elf > progcount2.ino.lss
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.CreateNoWindow = false;
+            startInfo.UseShellExecute = false;
+            startInfo.FileName = "objdump.exe";
+            startInfo.RedirectStandardOutput = true;
+            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+
+            startInfo.Arguments = "-S -l -C " + elfPath;
+
+            // disassembly file
+            if (doObjDump(startInfo, ".lss") == false)
+                return false;
+            if (ParseDisassembly(ShortFilename + ".lss") == false)
+                return false;
+
+            // debug info file
+            startInfo.Arguments = "-Wi " + elfPath;
+            if (doObjDump(startInfo, ".dbg") == false)
+                return false;
+            if (ParseDebugInfo(ShortFilename + ".dbg") == false)
+                return false;
+
+            //// line number table
+            //startInfo.Arguments = "-W " + elfPath;
+            //if (doObjDump(startInfo, ".lin") == false)
+            //    return false;
+
             return true;
 
         }
