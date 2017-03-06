@@ -43,6 +43,9 @@
             this.textToSend = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
             this.varView = new System.Windows.Forms.ListView();
+            this.columnName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnType = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnValue = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.labelSketch = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.sourceView = new System.Windows.Forms.ListView();
@@ -51,9 +54,10 @@
             this.columnLine = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnAddr = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.buttonLoad = new System.Windows.Forms.Button();
-            this.listDisassembly = new System.Windows.Forms.ListView();
+            this.disassemblyView = new System.Windows.Forms.ListView();
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnAddress = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             baudRateLabel = new System.Windows.Forms.Label();
             portNameLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
@@ -186,11 +190,33 @@
             // 
             // varView
             // 
+            this.varView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
+            this.columnName,
+            this.columnType,
+            this.columnAddress,
+            this.columnValue});
+            this.varView.GridLines = true;
             this.varView.Location = new System.Drawing.Point(480, 288);
+            this.varView.MultiSelect = false;
             this.varView.Name = "varView";
             this.varView.Size = new System.Drawing.Size(299, 227);
+            this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
+            this.varView.View = System.Windows.Forms.View.Details;
+            // 
+            // columnName
+            // 
+            this.columnName.Text = "Name";
+            this.columnName.Width = 100;
+            // 
+            // columnType
+            // 
+            this.columnType.Text = "Type";
+            // 
+            // columnValue
+            // 
+            this.columnValue.Text = "Value";
             // 
             // labelSketch
             // 
@@ -218,6 +244,7 @@
             this.columnLineNum,
             this.columnLine,
             this.columnAddr});
+            this.sourceView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
             this.sourceView.Location = new System.Drawing.Point(12, 40);
             this.sourceView.MultiSelect = false;
@@ -256,20 +283,21 @@
             this.buttonLoad.UseVisualStyleBackColor = true;
             this.buttonLoad.Click += new System.EventHandler(this.buttonLoad_Click);
             // 
-            // listDisassembly
+            // disassemblyView
             // 
-            this.listDisassembly.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
+            this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
             this.columnHeader1});
-            this.listDisassembly.FullRowSelect = true;
-            this.listDisassembly.HideSelection = false;
-            this.listDisassembly.Location = new System.Drawing.Point(480, 40);
-            this.listDisassembly.MultiSelect = false;
-            this.listDisassembly.Name = "listDisassembly";
-            this.listDisassembly.Size = new System.Drawing.Size(299, 213);
-            this.listDisassembly.TabIndex = 24;
-            this.listDisassembly.UseCompatibleStateImageBehavior = false;
-            this.listDisassembly.View = System.Windows.Forms.View.Details;
+            this.disassemblyView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.disassemblyView.FullRowSelect = true;
+            this.disassemblyView.HideSelection = false;
+            this.disassemblyView.Location = new System.Drawing.Point(480, 40);
+            this.disassemblyView.MultiSelect = false;
+            this.disassemblyView.Name = "disassemblyView";
+            this.disassemblyView.Size = new System.Drawing.Size(299, 213);
+            this.disassemblyView.TabIndex = 24;
+            this.disassemblyView.UseCompatibleStateImageBehavior = false;
+            this.disassemblyView.View = System.Windows.Forms.View.Details;
             // 
             // columnNum
             // 
@@ -281,12 +309,16 @@
             this.columnHeader1.Text = "Disassembly";
             this.columnHeader1.Width = 328;
             // 
+            // columnAddress
+            // 
+            this.columnAddress.Text = "Addr";
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1189, 549);
-            this.Controls.Add(this.listDisassembly);
+            this.Controls.Add(this.disassemblyView);
             this.Controls.Add(this.buttonLoad);
             this.Controls.Add(this.sourceView);
             this.Controls.Add(this.label2);
@@ -326,10 +358,14 @@
         private System.Windows.Forms.ColumnHeader columnLine;
         private System.Windows.Forms.ColumnHeader columnLineNum;
         private System.Windows.Forms.ColumnHeader columnAddr;
-        private System.Windows.Forms.ListView listDisassembly;
+        private System.Windows.Forms.ListView disassemblyView;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.ColumnHeader columnNum;
         private System.Windows.Forms.Button buttonScan;
+        private System.Windows.Forms.ColumnHeader columnName;
+        private System.Windows.Forms.ColumnHeader columnType;
+        private System.Windows.Forms.ColumnHeader columnValue;
+        private System.Windows.Forms.ColumnHeader columnAddress;
     }
 }
 

@@ -53,11 +53,11 @@ namespace ArdDebug
         /// Where this var is stored in memory
         /// </summary>
         public UInt16 Address { get; set; }
-    
+        public string currentValue { get; set; }
 
         public Variable()
         {
- 
+            currentValue = string.Empty;
         }
 
 

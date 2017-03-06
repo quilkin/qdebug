@@ -68,71 +68,25 @@ namespace ArdDebug
             if (str.Length == 0)
                 return;
 
-            Arduino.InteractionString buildStr = _arduino.comString;
+            //Arduino.InteractionString buildStr = _arduino.comString;
             tbData.AppendText(str);
-            if (buildStr != null)
-            {
-
-                buildStr.Content += str;
-
-                //if (buildStr.Content.Contains("num"))
-                //{
-                //    buildStr.Content = "num";
-                //}
-                if (buildStr.Content.Contains("\n"))
-                {
-                    // two messages may be concatenated
-                    string[] split = null;
-                    if (buildStr.Content.IndexOf('\n') < buildStr.Content.Length - 1)
-                    {
-                        split = buildStr.Content.Split('\n');
-                        if (split.Length > 1)
-                        {
-                            buildStr.Content = split[0];
-                        }
-                    }
-                    char firstChar = buildStr.Content[0];
-                    if (buildStr.Content.Length > 4)
-                    {
-                        //if (firstChar == (byte)Arduino.Chars.PROGCOUNT_CHAR) 
-                        if (firstChar == 'P')
-                        {
-                            string newString = _arduino.newProgramCounter(buildStr);
-                            //buildStr.Content = string.Empty;
-                        }
-                        else if (firstChar == 'S')
-                        {
-                            string reply = _arduino.newProgramCounter(buildStr);
-                            _spManager.Send(reply);
-                            //buildStr.Content = string.Empty;
-                        }
-                        else if (firstChar == 'T')
-                        {
-                            // no reply to send, just info
-
-                        }
-                    }
-                    if (split != null && split.Length > 1)
-                        buildStr.Content = split[1];
-                    else
-                        buildStr.Content = string.Empty;
-                }
-
-            }
+            _arduino.NewData(_spManager,str);
+            
 
         }
 
         // Handles the "Start Listening"-buttom click event
         private void btnStart_Click(object sender, EventArgs e)
         {
-            if (listDisassembly.Items.Count < 10)
+            if (disassemblyView.Items.Count < 10)
             {
                 MessageBox.Show("Must open your Arduino sketch first!");
                 this.buttonLoad.Select();
                 return;
             }
             _spManager.StartListening();
-            _arduino.comString = new Arduino.InteractionString();
+            //_arduino.comString = new Arduino.InteractionString();
+            _arduino.comString = null;
             _arduino.currentBreakpoint = null;
         }
 
@@ -160,11 +114,15 @@ namespace ArdDebug
         }
         public ListView DisassemblyView()
         {
-            return listDisassembly;
+            return disassemblyView;
+        }
+        public ListView VariableView()
+        {
+            return varView;
         }
         private void buttonLoad_Click(object sender, EventArgs e)
         {
-            if (_arduino.OpenFiles(this.sourceView,this.listDisassembly))
+            if (_arduino.OpenFiles(this.sourceView,this.disassemblyView,this.varView))
             {
                 this.labelSketch.Text = _arduino.FullFilename;
             }

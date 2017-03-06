@@ -11,7 +11,7 @@ namespace ArdDebug
     class Arduino
     {
 
-        private ListView source, disassembly;
+        private ListView source, disassembly, varView;
         public String ShortFilename { private set; get; }
         public String FullFilename { private set; get; }
 
@@ -25,6 +25,7 @@ namespace ArdDebug
         private List<String> MyVariables = new List<String>();
 
         public Breakpoint currentBreakpoint = null;
+        public String comString = String.Empty;
 
         /// <summary>
         /// ascii chars used for interaction strings
@@ -32,24 +33,42 @@ namespace ArdDebug
         /// </summary>
         //public enum Chars : byte { PROGCOUNT_CHAR = 248, TARGET_CHAR, STEPPING_CHAR, ADDRESS_CHAR, DATA_CHAR, NO_CHAR, YES_CHAR };
 
-        public class InteractionString
+        //public class InteractionString
+        //{
+        //    public int byteCount { get; set; }
+        //    public int messageLength { get; set; }
+        //    public ushort RecvdNumber { get; set; }
+
+        //    public string Content { get;  set; }
+        //    public InteractionString()
+        //    {
+        //        byteCount = 0;
+        //        messageLength = 0;
+        //        Content = string.Empty;
+        //        RecvdNumber = 0;
+        //    }
+        //}
+        //public InteractionString comString;
+
+        #region FILES
+
+        public bool OpenFiles(ListView source, ListView disassembly, ListView variables)
         {
-            public int byteCount { get; set; }
-            public int messageLength { get; set; }
-            public ushort RecvdNumber { get; set; }
-
-            public string Content { get;  set; }
-            public InteractionString()
+            this.source = source;
+            this.disassembly = disassembly;
+            this.varView = variables;
+            if (openSourceFile())
             {
-                byteCount = 0;
-                messageLength = 0;
-                Content = string.Empty;
-                RecvdNumber = 0;
+                if (OpenDisassembly())
+                {
+
+                    return true;
+                }
+
             }
+            MessageBox.Show("Problem opening files");
+            return false;
         }
-        public InteractionString comString;
-
-
         private bool openSourceFile()
         {
             OpenFileDialog ofd = new OpenFileDialog();
@@ -114,8 +133,62 @@ namespace ArdDebug
             return true;
         }
 
+        private bool OpenDisassembly()
+        {
+            // find the .elf file corresponding to this sketch
+            string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
+            string elfPath = null;
+            bool found = false;
+            foreach (string path in arduinoPaths)
+            {
+                elfPath = path + "\\" + ShortFilename + ".elf";
+                if (File.Exists(elfPath))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                MessageBox.Show("No compiled files found. You may need to recompile your project");
+                return false;
+            }
+            // Use ProcessStartInfo class
+            // objdump - d progcount2.ino.elf > progcount2.ino.lss
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.CreateNoWindow = false;
+            startInfo.UseShellExecute = false;
+            startInfo.FileName = "avr-objdump.exe";
+            startInfo.RedirectStandardOutput = true;
+            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
+            startInfo.Arguments = "-S -l -C " + elfPath;
 
+            // disassembly file
+            if (doObjDump(startInfo, ".lss") == false)
+                return false;
+            if (ParseDisassembly(ShortFilename + ".lss") == false)
+                return false;
+
+            // debug info file
+            startInfo.Arguments = "-Wi " + elfPath;
+            if (doObjDump(startInfo, ".dbg") == false)
+                return false;
+            if (ParseDebugInfo(ShortFilename + ".dbg") == false)
+                return false;
+
+            //// line number table
+            //startInfo.Arguments = "-W " + elfPath;
+            //if (doObjDump(startInfo, ".lin") == false)
+            //    return false;
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region PARSE
         private bool ParseDebugInfo(string file)
         {
             Variable var = null;
@@ -193,7 +266,9 @@ namespace ArdDebug
                 }
             }
 
-            // now find the variables themselves
+
+            // now find the variables themselves. Remove old ones first
+            varView.Items.Clear();
             foreach (string line in File.ReadLines(file))
             {
                 //// looking for info like this, to find location of our variables ('numf' is a global in this example)
@@ -254,6 +329,12 @@ namespace ArdDebug
                         {
                             var.Address = (ushort)(loc & 0xFFFF);
                             Variables.Add(var);
+                            ListViewItem lvi = new ListViewItem();
+                            lvi.Text = var.Name.ToString();
+                            lvi.SubItems.Add(var.Type.Name);
+                            lvi.SubItems.Add(var.Address.ToString("X"));
+                            lvi.SubItems.Add(var.currentValue);
+                            varView.Items.Add(lvi);
                             var = null;  // get ready for next one
                         }
                         else
@@ -267,6 +348,9 @@ namespace ArdDebug
                     var = new Variable();
                 }
             }
+
+
+
             return true;
         }
         private bool ParseDisassembly(string file)
@@ -368,59 +452,58 @@ namespace ArdDebug
             }
             return true;
         }
-        private bool OpenDisassembly()
+        #endregion
+
+        #region INTERACTION
+        public String NewData(ArdDebug.Serial.SerialPortManager spmanager,String str)
         {
-            // find the .elf file corresponding to this sketch
-            string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
-            string elfPath = null;
-            bool found = false;
-            foreach (string path in arduinoPaths)
+            comString += str;
+            if (comString.Contains("\n"))
             {
-                elfPath = path + "\\" + ShortFilename + ".elf";
-                if (File.Exists(elfPath))
+                 // two messages may be concatenated
+                string[] split = null;
+                if (comString.IndexOf('\n') < comString.Length - 1)
                 {
-                    found = true;
-                    break;
+                    split = comString.Split('\n');
+                    if (split.Length > 1)
+                    {
+                        comString = split[0];
+                    }
                 }
+                char firstChar = comString[0];
+                if (comString.Length > 4)
+                {
+                    //if (firstChar == (byte)Arduino.Chars.PROGCOUNT_CHAR) 
+                    if (firstChar == 'P')
+                    {
+                        newProgramCounter();
+                    }
+                    else if (firstChar == 'S')
+                    {
+                        string reply = newProgramCounter();
+                        spmanager.Send(reply);
+                    }
+                    else if (firstChar == 'D')
+                    {
+                        // incoming data for a variable
+
+                    }
+                    else if (firstChar == 'T')
+                    {
+                        // no reply to send, just info
+
+                    }
+                }
+                if (split != null && split.Length > 1)
+                    comString = split[1];
+                else
+                    comString = string.Empty;
+ 
+
             }
-            if (!found)
-            {
-                MessageBox.Show("No compiled files found. You may need to recompile your project");
-                return false;
-            }
-            // Use ProcessStartInfo class
-            // objdump - d progcount2.ino.elf > progcount2.ino.lss
-            ProcessStartInfo startInfo = new ProcessStartInfo();
-            startInfo.CreateNoWindow = false;
-            startInfo.UseShellExecute = false;
-            startInfo.FileName = "objdump.exe";
-            startInfo.RedirectStandardOutput = true;
-            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
-            startInfo.Arguments = "-S -l -C " + elfPath;
-
-            // disassembly file
-            if (doObjDump(startInfo, ".lss") == false)
-                return false;
-            if (ParseDisassembly(ShortFilename + ".lss") == false)
-                return false;
-
-            // debug info file
-            startInfo.Arguments = "-Wi " + elfPath;
-            if (doObjDump(startInfo, ".dbg") == false)
-                return false;
-            if (ParseDebugInfo(ShortFilename + ".dbg") == false)
-                return false;
-
-            //// line number table
-            //startInfo.Arguments = "-W " + elfPath;
-            //if (doObjDump(startInfo, ".lin") == false)
-            //    return false;
-
-            return true;
-
+            return comString;
         }
-
+ 
         /// <summary>
         /// use the list of breakpoint-able lines to determine the next place to 'single-step' to
         /// </summary>
@@ -500,14 +583,14 @@ namespace ArdDebug
 
         }
 
-        public string newProgramCounter(InteractionString pcString)
+        public string newProgramCounter()
         {
             ushort pc;
-            if (pcString.Content.Length < 5)
+            if (comString.Length < 5)
                 return null;
-            if (ushort.TryParse(pcString.Content.Substring(1,4), System.Globalization.NumberStyles.HexNumber, null, out pc))
+            if (ushort.TryParse(comString.Substring(1,4), System.Globalization.NumberStyles.HexNumber, null, out pc))
             {
-                byte firstChar = (byte)pcString.Content[0];
+                byte firstChar = (byte)comString[0];
                 if (firstChar == 'S')
                 //if (firstChar == (char)Chars.STEPPING_CHAR)
                     {
@@ -534,23 +617,9 @@ namespace ArdDebug
             return null;
         }
 
+        #endregion
 
-        public bool OpenFiles(ListView source, ListView disassembly)
-        {
-            this.source = source;
-            this.disassembly = disassembly;
-            if (openSourceFile())
-            {
-                if (OpenDisassembly())
-                {
-
-                    return true;
-                }
-
-            }
-            MessageBox.Show("Problem opening files");
-            return false;
-        }
+        
     }
 
 }
