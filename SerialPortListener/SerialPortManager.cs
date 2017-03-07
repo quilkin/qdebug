@@ -104,7 +104,7 @@ namespace ArdDebug.Serial
         private SerialPort _serialPort;
         private SerialSettings _currentSerialSettings = new SerialSettings();
         private string _latestRecieved = String.Empty;
-        public event EventHandler<SerialDataEventArgs> NewSerialDataRecieved; 
+       // public event EventHandler<SerialDataEventArgs> NewSerialDataRecieved; 
 
         #endregion
 
@@ -130,23 +130,55 @@ namespace ArdDebug.Serial
         }
 
         
-        void _serialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
-        {
-            int dataLength = _serialPort.BytesToRead;
-            byte[] data = new byte[dataLength];
-            int nbrDataRead = _serialPort.Read(data, 0, dataLength);
-            if (nbrDataRead == 0)
-                return;
-            
-            // Send data to whom ever interested
-            if (NewSerialDataRecieved != null)
-                NewSerialDataRecieved(this, new SerialDataEventArgs(data));
-        }
+        //void _serialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        //{
+        //    int dataLength = _serialPort.BytesToRead;
+        //    byte[] data = new byte[dataLength];
+        //    int nbrDataRead = _serialPort.Read(data, 0, dataLength);
+        //    if (nbrDataRead == 0)
+        //        return;
+        //    lock (Arduino.expectedReply)
+        //    {
+        //        if (data.AsQueryable().Contains<byte>((byte)'\n'))
+        //        {
+        //            Arduino.waitingForRX.Set();
+        //        }
+        //    }
+        //    // Send data to whom ever interested
+        //    if (NewSerialDataRecieved != null)
+        //        NewSerialDataRecieved(this, new SerialDataEventArgs(data));
+        //}
 
         #endregion
 
         #region Methods
 
+        public string ReadLine()
+        {
+            try
+            {
+                return _serialPort.ReadLine();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+        public string ReadLine(int timeout)
+        {
+            string line;
+            _serialPort.ReadTimeout = timeout;
+            try
+            {
+                line = _serialPort.ReadLine();
+            }
+            catch
+            {
+                line = string.Empty;
+            }
+            _serialPort.ReadTimeout = 500;
+            return line;
+        }
         public void Send(string s)
         {
             //s += '\n';
@@ -178,9 +210,9 @@ namespace ArdDebug.Serial
            // _serialPort.Handshake = Handshake.RequestToSend;
             _serialPort.RtsEnable = true;
             _serialPort.DtrEnable = true;
-            //_serialPort.ReadTimeout = 500;
+            _serialPort.ReadTimeout = 500;
             // Subscribe to event and open serial port for data
-            _serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
+            //_serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
             _serialPort.Open();
         }
 
@@ -222,7 +254,7 @@ namespace ArdDebug.Serial
         {
             if (disposing)
             {
-                _serialPort.DataReceived -= new SerialDataReceivedEventHandler(_serialPort_DataReceived);
+             //   _serialPort.DataReceived -= new SerialDataReceivedEventHandler(_serialPort_DataReceived);
             }
             // Releasing serial port (and other unmanaged objects)
             if (_serialPort != null)

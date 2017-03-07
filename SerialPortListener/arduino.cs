@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.IO;
 using System.Diagnostics;
+using System.Threading;
 
 namespace ArdDebug
 {
@@ -12,6 +13,7 @@ namespace ArdDebug
     {
 
         private ListView source, disassembly, varView;
+        private TextBox comms;
         public String ShortFilename { private set; get; }
         public String FullFilename { private set; get; }
 
@@ -26,6 +28,10 @@ namespace ArdDebug
 
         public Breakpoint currentBreakpoint = null;
         public String comString = String.Empty;
+        public UInt16 requestedAddr = 0;
+        //public static ManualResetEvent waitingForRX = new ManualResetEvent(false);
+        //public static object expectedReply = new Object();
+        Serial.SerialPortManager spmanager;
 
         /// <summary>
         /// ascii chars used for interaction strings
@@ -33,35 +39,24 @@ namespace ArdDebug
         /// </summary>
         //public enum Chars : byte { PROGCOUNT_CHAR = 248, TARGET_CHAR, STEPPING_CHAR, ADDRESS_CHAR, DATA_CHAR, NO_CHAR, YES_CHAR };
 
-        //public class InteractionString
-        //{
-        //    public int byteCount { get; set; }
-        //    public int messageLength { get; set; }
-        //    public ushort RecvdNumber { get; set; }
-
-        //    public string Content { get;  set; }
-        //    public InteractionString()
-        //    {
-        //        byteCount = 0;
-        //        messageLength = 0;
-        //        Content = string.Empty;
-        //        RecvdNumber = 0;
-        //    }
-        //}
-        //public InteractionString comString;
 
         #region FILES
 
-        public bool OpenFiles(ListView source, ListView disassembly, ListView variables)
+        public bool OpenFiles(ListView source, ListView disassembly, ListView variables, TextBox comms)
         {
             this.source = source;
             this.disassembly = disassembly;
             this.varView = variables;
+            this.comms = comms;
             if (openSourceFile())
             {
+
                 if (OpenDisassembly())
                 {
-
+                    // get ready to accept breakpoints
+                    source.Click += Source_Click;
+                    //source.SelectedIndexChanged += Source_SelectedIndexChanged;
+                    //source.ItemChecked += Source_ItemChecked;
                     return true;
                 }
 
@@ -69,6 +64,8 @@ namespace ArdDebug
             MessageBox.Show("Problem opening files");
             return false;
         }
+
+
         private bool openSourceFile()
         {
             OpenFileDialog ofd = new OpenFileDialog();
@@ -81,6 +78,8 @@ namespace ArdDebug
                 FullFilename = ofd.FileName;
                 source.Items.Clear();
                 disassembly.Items.Clear();
+                varView.Items.Clear();
+                Variables.Clear();
                 int count = 1;
                 foreach (var line in System.IO.File.ReadLines(ofd.FileName))
                 {
@@ -362,9 +361,11 @@ namespace ArdDebug
             foreach (string line in File.ReadLines(file))
             {
                 ListViewItem lvi = new ListViewItem();
-                lvi.Text = (count++).ToString();
-                lvi.SubItems.Add(line.Replace("\t", "    "));
-                disassembly.Items.Add(lvi);
+                //lvi.Text = (count++).ToString();
+                //lvi.SubItems.Add(line.Replace("\t", "    "));
+                // disassembly.Items.Add(lvi);
+                if (line.Length < 3)
+                    continue;
 
                 if (bp != null)
                 {
@@ -387,7 +388,7 @@ namespace ArdDebug
                                 ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
                                 if (sourceItem != null)
                                 {
-                                    sourceItem.Checked = true;
+                                    sourceItem.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
                                 }
                             }
                             bp = null;
@@ -412,17 +413,19 @@ namespace ArdDebug
                             // should be a variable declaration. Might be local (deal with that later.....)
                             char[] delimiters = new char[] { ' ' };
                             string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length < 4)
-                                continue;           // not a declaration
-                            if (parts[1] == "=")
-                                continue;  // not a declaration
-                            string varName = null; 
-                            if (parts[2]=="=")
-                                varName = parts[1];
-                            else if (parts[3]=="=")
-                                varName = parts[2];
-                            if (varName != null)
-                                MyVariables.Add(varName);
+                            if (parts.Length > 3)
+                            {
+                                if (parts[1] != "=")
+                                {
+                                    string varName = null;
+                                    if (parts[2] == "=")
+                                        varName = parts[1];
+                                    else if (parts[3] == "=")
+                                        varName = parts[2];
+                                    if (varName != null)
+                                        MyVariables.Add(varName);
+                                }
+                            }
                         }
                     }
                 }
@@ -444,6 +447,26 @@ namespace ArdDebug
                     }
                 }
 
+                if (line[1]==':' && line[2]=='\\')
+                {
+                    // name of file, don't need in disassembly
+                    continue;
+                }
+                if (line.IndexOf("//") == 0)
+                {
+                    // comment, don't need in disassembly
+                    continue;
+                }
+                if (line.IndexOf("\t//") == 0)
+                {
+                    // comment, don't need in disassembly
+                    continue;
+                }
+                lvi.Text = (count++).ToString();
+                lvi.SubItems.Add(line.Replace("\t", "    "));
+                disassembly.Items.Add(lvi);
+ 
+
             }
             if (disassembly.Items.Count < 3)
             {
@@ -455,55 +478,120 @@ namespace ArdDebug
         #endregion
 
         #region INTERACTION
-        public String NewData(ArdDebug.Serial.SerialPortManager spmanager,String str)
+        private void UpdateCommsBox(string str, bool sending)
         {
-            comString += str;
-            if (comString.Contains("\n"))
-            {
-                 // two messages may be concatenated
-                string[] split = null;
-                if (comString.IndexOf('\n') < comString.Length - 1)
+            if (str == null)
+                return;
+            int maxTextLength = 1000; // maximum text length in text box
+            if (comms.TextLength > maxTextLength)
+                comms.Text = comms.Text.Remove(0, maxTextLength / 2);
+
+            comms.ForeColor = (sending ? System.Drawing.Color.Red : System.Drawing.Color.Black);
+
+            comms.AppendText(str + " ");
+        }
+
+        private string ReadLine(int timeout)
+        {
+            string str = spmanager.ReadLine(timeout);
+            UpdateCommsBox(str,false);
+            return str;
+        }
+        private string ReadLine()
+        {
+            string str = spmanager.ReadLine();
+            UpdateCommsBox(str,false);
+            return str;
+        }
+        private void Send(string str)
+        {
+            UpdateCommsBox(str,true);
+            spmanager.Send(str);
+        }
+        public void Startup(Serial.SerialPortManager _spmanager)
+        {
+            this.spmanager = _spmanager;
+            spmanager.StartListening();  // this will reset the Arduino
+            comString = null;
+            currentBreakpoint = null;
+            Send("startup");
+            // might take  a while for a reset etc
+            comString = ReadLine(5000);
+            GetVariables();
+        }
+        public void SingleStep()
+        {
+            String stepStr = "P0000\n";
+            bool continuing = true;
+            Send(stepStr);
+            while (continuing) { 
+                comString = ReadLine();
+                if (comString.Length == 0)
                 {
-                    split = comString.Split('\n');
-                    if (split.Length > 1)
-                    {
-                        comString = split[0];
-                    }
+                    MessageBox.Show("timeout in single step");
+                    break;
                 }
                 char firstChar = comString[0];
-                if (comString.Length > 4)
+                if (firstChar == 'P')
                 {
-                    //if (firstChar == (byte)Arduino.Chars.PROGCOUNT_CHAR) 
-                    if (firstChar == 'P')
-                    {
-                        newProgramCounter();
-                    }
-                    else if (firstChar == 'S')
-                    {
-                        string reply = newProgramCounter();
-                        spmanager.Send(reply);
-                    }
-                    else if (firstChar == 'D')
-                    {
-                        // incoming data for a variable
-
-                    }
-                    else if (firstChar == 'T')
-                    {
-                        // no reply to send, just info
-
-                    }
+                    // moved to where we need; this is our 'step'
+                    continuing = false;
+                    newProgramCounter();
+                    GetVariables();
                 }
-                if (split != null && split.Length > 1)
-                    comString = split[1];
-                else
-                    comString = string.Empty;
- 
-
+                else if (firstChar == 'S')
+                {
+                    string reply = newProgramCounter();
+                    Send(reply);
+                    
+                }
             }
-            return comString;
+
         }
- 
+
+        public void GoToBreakpoint()
+        {
+            bool bpFound = false;
+            foreach (Breakpoint bp in Breakpoints)
+            {
+                if (bp.Manual)
+                {
+                    bpFound = true;
+                    String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
+                    Send(sendStr);
+                    comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
+                    // now wait for the bp to be hit.....
+                    comString = ReadLine(System.IO.Ports.SerialPort.InfiniteTimeout);  /// ***need to change to successive short timeouts so we can escape
+                    GetVariables();
+                    UpdateVariableWindow();
+                    MarkBreakpointHit(bp);
+                }
+            }
+            if (!bpFound)
+            {
+                MessageBox.Show("No breakpoints set!");
+                return;
+            }
+
+
+        }
+
+        public void GetVariables()
+        {
+            String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
+            Send(sendStr);
+            System.Threading.Thread.Sleep(100);
+            foreach (Variable var in Variables)
+            {
+                requestedAddr = var.Address;
+                sendStr = "A" + requestedAddr.ToString("X4") + "\n";
+                Send(sendStr);
+                comString = ReadLine();
+                newVariableData();
+            }
+            UpdateVariableWindow();
+
+        }
         /// <summary>
         /// use the list of breakpoint-able lines to determine the next place to 'single-step' to
         /// </summary>
@@ -531,6 +619,23 @@ namespace ArdDebug
                 }
             }
             return false;
+        }
+
+        void UpdateVariableWindow()
+        {
+            // a bit inefficient but will do for now
+            varView.Items.Clear();
+            foreach (Variable var in Variables)
+            {
+                ListViewItem lvi = new ListViewItem();
+                lvi.Text = var.Name.ToString();
+                lvi.SubItems.Add(var.Type.Name);
+                lvi.SubItems.Add("0x" + var.Address.ToString("X4"));
+                lvi.SubItems.Add(var.currentValue);
+                varView.Items.Add(lvi);
+            }
+
+
         }
 
         void UpdateCodeWindows(ushort pc) {
@@ -583,6 +688,83 @@ namespace ArdDebug
 
         }
 
+
+
+        private void Source_Click(object sender, EventArgs e)
+        {
+
+            if (source.SelectedItems.Count == 0)
+                return;
+            ListView.ListViewItemCollection sourceItems = source.Items;
+            ListViewItem lvi = source.SelectedItems[0];
+
+            // set a new breakpoint (only 1 bp allowed for now....)
+
+
+            if (lvi.SubItems[0].BackColor == System.Drawing.Color.AliceBlue) // i.e. breakpoint possible on this line
+            {
+
+                // now need to find the correct (single-step) breakpoint and make it manual
+                foreach (Breakpoint bp in Breakpoints)
+                {
+                    if (bp.SourceLine == lvi.Index + 1)
+                    {
+                        if (lvi.BackColor == System.Drawing.Color.Red || lvi.BackColor == System.Drawing.Color.Orange)
+                        {
+                            //bp already set; unset it
+                            bp.Manual = false;
+                            lvi.BackColor = System.Drawing.Color.White;
+                            lvi.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
+                        }
+                        else
+                        {
+                            bp.Manual = true;
+                            lvi.Selected = false;
+                            lvi.BackColor = System.Drawing.Color.Red;
+
+                        }
+                    }
+
+                    else
+                    {
+
+                        bp.Manual = false;
+                        ListViewItem item = sourceItems[bp.SourceLine - 1];
+                        item.BackColor = System.Drawing.Color.White;
+                        item.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
+                    }
+                }
+            }
+
+        }
+
+        private void MarkBreakpointHit(Breakpoint bp)
+        {
+            ListView.ListViewItemCollection sourceItems = source.Items;
+            ListViewItem item = sourceItems[bp.SourceLine - 1];
+            item.BackColor = System.Drawing.Color.Orange;
+        }
+
+        public void newVariableData()
+        {
+            ushort data;
+            if (comString.Length < 5)
+                return;
+            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
+            {
+                Variable var = Variables.Find(x => x.Address == requestedAddr);
+                if (var.Type.Name == "char")
+                {
+                    // our data has two bytes; we just want the 'first' one
+                    char ch = (char)(data & 0xFF);
+                    var.currentValue = "'" + ch + "'";
+                }
+                else
+                {
+                    var.currentValue = data.ToString();
+                }
+            }
+        }
         public string newProgramCounter()
         {
             ushort pc;

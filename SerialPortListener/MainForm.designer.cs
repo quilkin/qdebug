@@ -30,21 +30,23 @@
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.Label baudRateLabel;
-            System.Windows.Forms.Label portNameLabel;
             this.baudRateComboBox = new System.Windows.Forms.ComboBox();
             this.serialSettingsBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.portNameComboBox = new System.Windows.Forms.ComboBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.buttonScan = new System.Windows.Forms.Button();
+            this.textToSend = new System.Windows.Forms.TextBox();
+            this.btnStop = new System.Windows.Forms.Button();
             this.btnStart = new System.Windows.Forms.Button();
             this.tbData = new System.Windows.Forms.TextBox();
-            this.btnStop = new System.Windows.Forms.Button();
-            this.buttonSend = new System.Windows.Forms.Button();
-            this.textToSend = new System.Windows.Forms.TextBox();
+            this.buttonPause = new System.Windows.Forms.Button();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.buttonRun = new System.Windows.Forms.Button();
+            this.buttonStep = new System.Windows.Forms.Button();
             this.varView = new System.Windows.Forms.ListView();
             this.columnName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnType = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnAddress = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnValue = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.labelSketch = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
@@ -56,10 +58,8 @@
             this.buttonLoad = new System.Windows.Forms.Button();
             this.disassemblyView = new System.Windows.Forms.ListView();
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.columnAddress = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnText = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             baudRateLabel = new System.Windows.Forms.Label();
-            portNameLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
             this.panel1.SuspendLayout();
@@ -68,56 +68,48 @@
             // baudRateLabel
             // 
             baudRateLabel.AutoSize = true;
-            baudRateLabel.Location = new System.Drawing.Point(10, 59);
+            baudRateLabel.Location = new System.Drawing.Point(34, 49);
             baudRateLabel.Name = "baudRateLabel";
             baudRateLabel.Size = new System.Drawing.Size(61, 13);
             baudRateLabel.TabIndex = 1;
             baudRateLabel.Text = "Baud Rate:";
             // 
-            // portNameLabel
-            // 
-            portNameLabel.AutoSize = true;
-            portNameLabel.Location = new System.Drawing.Point(10, 32);
-            portNameLabel.Name = "portNameLabel";
-            portNameLabel.Size = new System.Drawing.Size(105, 13);
-            portNameLabel.TabIndex = 7;
-            portNameLabel.Text = "Arduino connection: ";
-            // 
             // baudRateComboBox
             // 
             this.baudRateComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "BaudRate", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.baudRateComboBox.FormattingEnabled = true;
-            this.baudRateComboBox.Location = new System.Drawing.Point(77, 56);
+            this.baudRateComboBox.Location = new System.Drawing.Point(101, 46);
             this.baudRateComboBox.Name = "baudRateComboBox";
-            this.baudRateComboBox.Size = new System.Drawing.Size(96, 21);
+            this.baudRateComboBox.Size = new System.Drawing.Size(71, 21);
             this.baudRateComboBox.TabIndex = 2;
             // 
             // portNameComboBox
             // 
             this.portNameComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "PortName", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.portNameComboBox.FormattingEnabled = true;
-            this.portNameComboBox.Location = new System.Drawing.Point(121, 29);
+            this.portNameComboBox.Location = new System.Drawing.Point(6, 21);
             this.portNameComboBox.Name = "portNameComboBox";
-            this.portNameComboBox.Size = new System.Drawing.Size(96, 21);
+            this.portNameComboBox.Size = new System.Drawing.Size(89, 21);
             this.portNameComboBox.TabIndex = 8;
             // 
             // groupBox1
             // 
             this.groupBox1.Controls.Add(this.buttonScan);
             this.groupBox1.Controls.Add(this.baudRateComboBox);
+            this.groupBox1.Controls.Add(this.textToSend);
             this.groupBox1.Controls.Add(baudRateLabel);
+            this.groupBox1.Controls.Add(this.btnStop);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Controls.Add(portNameLabel);
-            this.groupBox1.Location = new System.Drawing.Point(11, 14);
+            this.groupBox1.Location = new System.Drawing.Point(15, 14);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(343, 86);
+            this.groupBox1.Size = new System.Drawing.Size(185, 104);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
-            this.groupBox1.Text = "COM Settings (must be same as your sketch)";
+            this.groupBox1.Text = "Arduino Connection";
             // 
             // buttonScan
             // 
-            this.buttonScan.Location = new System.Drawing.Point(223, 27);
+            this.buttonScan.Location = new System.Drawing.Point(101, 19);
             this.buttonScan.Name = "buttonScan";
             this.buttonScan.Size = new System.Drawing.Size(71, 23);
             this.buttonScan.TabIndex = 17;
@@ -125,11 +117,29 @@
             this.buttonScan.UseVisualStyleBackColor = true;
             this.buttonScan.Click += new System.EventHandler(this.buttonScan_Click);
             // 
+            // textToSend
+            // 
+            this.textToSend.Location = new System.Drawing.Point(101, 73);
+            this.textToSend.MaxLength = 32;
+            this.textToSend.Name = "textToSend";
+            this.textToSend.Size = new System.Drawing.Size(71, 20);
+            this.textToSend.TabIndex = 16;
+            // 
+            // btnStop
+            // 
+            this.btnStop.Location = new System.Drawing.Point(6, 70);
+            this.btnStop.Name = "btnStop";
+            this.btnStop.Size = new System.Drawing.Size(89, 23);
+            this.btnStop.TabIndex = 12;
+            this.btnStop.Text = "Close connection";
+            this.btnStop.UseVisualStyleBackColor = true;
+            this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
+            // 
             // btnStart
             // 
-            this.btnStart.Location = new System.Drawing.Point(11, 106);
+            this.btnStart.Location = new System.Drawing.Point(682, 11);
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(102, 23);
+            this.btnStart.Size = new System.Drawing.Size(97, 23);
             this.btnStart.TabIndex = 12;
             this.btnStart.Text = "Start / Reset";
             this.btnStart.UseVisualStyleBackColor = true;
@@ -140,66 +150,65 @@
             this.tbData.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tbData.Location = new System.Drawing.Point(11, 164);
+            this.tbData.Location = new System.Drawing.Point(834, 195);
             this.tbData.Multiline = true;
             this.tbData.Name = "tbData";
             this.tbData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbData.Size = new System.Drawing.Size(355, 327);
+            this.tbData.Size = new System.Drawing.Size(211, 90);
             this.tbData.TabIndex = 13;
             // 
-            // btnStop
+            // buttonPause
             // 
-            this.btnStop.Location = new System.Drawing.Point(11, 135);
-            this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(102, 23);
-            this.btnStop.TabIndex = 12;
-            this.btnStop.Text = "Close connection";
-            this.btnStop.UseVisualStyleBackColor = true;
-            this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
-            // 
-            // buttonSend
-            // 
-            this.buttonSend.Location = new System.Drawing.Point(264, 135);
-            this.buttonSend.Name = "buttonSend";
-            this.buttonSend.Size = new System.Drawing.Size(90, 23);
-            this.buttonSend.TabIndex = 15;
-            this.buttonSend.Text = "Send";
-            this.buttonSend.UseVisualStyleBackColor = true;
-            this.buttonSend.Click += new System.EventHandler(this.buttonSend_Click);
-            // 
-            // textToSend
-            // 
-            this.textToSend.Location = new System.Drawing.Point(264, 106);
-            this.textToSend.MaxLength = 32;
-            this.textToSend.Name = "textToSend";
-            this.textToSend.Size = new System.Drawing.Size(90, 20);
-            this.textToSend.TabIndex = 16;
+            this.buttonPause.Location = new System.Drawing.Point(962, 11);
+            this.buttonPause.Name = "buttonPause";
+            this.buttonPause.Size = new System.Drawing.Size(72, 23);
+            this.buttonPause.TabIndex = 15;
+            this.buttonPause.Text = "Pause";
+            this.buttonPause.UseVisualStyleBackColor = true;
+            this.buttonPause.Click += new System.EventHandler(this.buttonPause_Click);
             // 
             // panel1
             // 
             this.panel1.Controls.Add(this.groupBox1);
-            this.panel1.Controls.Add(this.tbData);
-            this.panel1.Controls.Add(this.buttonSend);
-            this.panel1.Controls.Add(this.textToSend);
-            this.panel1.Controls.Add(this.btnStart);
-            this.panel1.Controls.Add(this.btnStop);
-            this.panel1.Location = new System.Drawing.Point(802, 21);
+            this.panel1.Location = new System.Drawing.Point(834, 48);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(375, 494);
+            this.panel1.Size = new System.Drawing.Size(211, 132);
             this.panel1.TabIndex = 17;
+            // 
+            // buttonRun
+            // 
+            this.buttonRun.Location = new System.Drawing.Point(870, 11);
+            this.buttonRun.Name = "buttonRun";
+            this.buttonRun.Size = new System.Drawing.Size(84, 23);
+            this.buttonRun.TabIndex = 18;
+            this.buttonRun.Text = "Run";
+            this.buttonRun.UseVisualStyleBackColor = true;
+            this.buttonRun.Click += new System.EventHandler(this.buttonRun_Click);
+            // 
+            // buttonStep
+            // 
+            this.buttonStep.Location = new System.Drawing.Point(785, 11);
+            this.buttonStep.Name = "buttonStep";
+            this.buttonStep.Size = new System.Drawing.Size(79, 23);
+            this.buttonStep.TabIndex = 17;
+            this.buttonStep.Text = "Step";
+            this.buttonStep.UseVisualStyleBackColor = true;
+            this.buttonStep.Click += new System.EventHandler(this.buttonStep_Click);
             // 
             // varView
             // 
+            this.varView.BackColor = System.Drawing.SystemColors.GradientInactiveCaption;
             this.varView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnName,
             this.columnType,
             this.columnAddress,
             this.columnValue});
             this.varView.GridLines = true;
-            this.varView.Location = new System.Drawing.Point(480, 288);
+            this.varView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
+            this.varView.Location = new System.Drawing.Point(529, 64);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(299, 227);
+            this.varView.Size = new System.Drawing.Size(299, 221);
             this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
@@ -213,6 +222,10 @@
             // columnType
             // 
             this.columnType.Text = "Type";
+            // 
+            // columnAddress
+            // 
+            this.columnAddress.Text = "Addr";
             // 
             // columnValue
             // 
@@ -230,7 +243,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(477, 272);
+            this.label2.Location = new System.Drawing.Point(526, 48);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(74, 13);
             this.label2.TabIndex = 21;
@@ -238,7 +251,6 @@
             // 
             // sourceView
             // 
-            this.sourceView.CheckBoxes = true;
             this.sourceView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnBP,
             this.columnLineNum,
@@ -246,10 +258,11 @@
             this.columnAddr});
             this.sourceView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
+            this.sourceView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.sourceView.Location = new System.Drawing.Point(12, 40);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(446, 491);
+            this.sourceView.Size = new System.Drawing.Size(493, 491);
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -277,7 +290,7 @@
             // 
             this.buttonLoad.Location = new System.Drawing.Point(480, 10);
             this.buttonLoad.Name = "buttonLoad";
-            this.buttonLoad.Size = new System.Drawing.Size(299, 23);
+            this.buttonLoad.Size = new System.Drawing.Size(196, 23);
             this.buttonLoad.TabIndex = 23;
             this.buttonLoad.Text = "Load Sketch";
             this.buttonLoad.UseVisualStyleBackColor = true;
@@ -287,14 +300,15 @@
             // 
             this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
-            this.columnHeader1});
+            this.columnText});
             this.disassemblyView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.disassemblyView.FullRowSelect = true;
+            this.disassemblyView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.disassemblyView.HideSelection = false;
-            this.disassemblyView.Location = new System.Drawing.Point(480, 40);
+            this.disassemblyView.Location = new System.Drawing.Point(529, 313);
             this.disassemblyView.MultiSelect = false;
             this.disassemblyView.Name = "disassemblyView";
-            this.disassemblyView.Size = new System.Drawing.Size(299, 213);
+            this.disassemblyView.Size = new System.Drawing.Size(516, 218);
             this.disassemblyView.TabIndex = 24;
             this.disassemblyView.UseCompatibleStateImageBehavior = false;
             this.disassemblyView.View = System.Windows.Forms.View.Details;
@@ -302,28 +316,29 @@
             // columnNum
             // 
             this.columnNum.Text = "#";
-            this.columnNum.Width = 40;
+            this.columnNum.Width = 1;
             // 
-            // columnHeader1
+            // columnText
             // 
-            this.columnHeader1.Text = "Disassembly";
-            this.columnHeader1.Width = 328;
-            // 
-            // columnAddress
-            // 
-            this.columnAddress.Text = "Addr";
+            this.columnText.Text = "Disassembly";
+            this.columnText.Width = 600;
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1189, 549);
+            this.ClientSize = new System.Drawing.Size(1057, 549);
+            this.Controls.Add(this.buttonRun);
+            this.Controls.Add(this.tbData);
             this.Controls.Add(this.disassemblyView);
+            this.Controls.Add(this.buttonStep);
             this.Controls.Add(this.buttonLoad);
+            this.Controls.Add(this.buttonPause);
             this.Controls.Add(this.sourceView);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.labelSketch);
             this.Controls.Add(this.varView);
+            this.Controls.Add(this.btnStart);
             this.Controls.Add(this.panel1);
             this.Name = "MainForm";
             this.Text = "Arduino Debugger";
@@ -331,7 +346,6 @@
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.panel1.ResumeLayout(false);
-            this.panel1.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -346,7 +360,7 @@
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.TextBox tbData;
         private System.Windows.Forms.Button btnStop;
-        private System.Windows.Forms.Button buttonSend;
+        private System.Windows.Forms.Button buttonPause;
         private System.Windows.Forms.TextBox textToSend;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.ListView varView;
@@ -359,13 +373,15 @@
         private System.Windows.Forms.ColumnHeader columnLineNum;
         private System.Windows.Forms.ColumnHeader columnAddr;
         private System.Windows.Forms.ListView disassemblyView;
-        private System.Windows.Forms.ColumnHeader columnHeader1;
+        private System.Windows.Forms.ColumnHeader columnText;
         private System.Windows.Forms.ColumnHeader columnNum;
         private System.Windows.Forms.Button buttonScan;
         private System.Windows.Forms.ColumnHeader columnName;
         private System.Windows.Forms.ColumnHeader columnType;
         private System.Windows.Forms.ColumnHeader columnValue;
         private System.Windows.Forms.ColumnHeader columnAddress;
+        private System.Windows.Forms.Button buttonStep;
+        private System.Windows.Forms.Button buttonRun;
     }
 }
 
