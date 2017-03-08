@@ -167,6 +167,7 @@ namespace ArdDebug.Serial
         public string ReadLine(int timeout)
         {
             string line;
+            int oldTimeout = _serialPort.ReadTimeout;
             _serialPort.ReadTimeout = timeout;
             try
             {
@@ -176,7 +177,7 @@ namespace ArdDebug.Serial
             {
                 line = string.Empty;
             }
-            _serialPort.ReadTimeout = 500;
+            _serialPort.ReadTimeout = oldTimeout;
             return line;
         }
         public void Send(string s)

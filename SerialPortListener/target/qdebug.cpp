@@ -10,7 +10,7 @@
 QDebug::QDebug()
 {
 
-	Serial.begin(38400);
+	Serial.begin(57600);
 	delay(500);
 
   // force continuous interrupts on analog compare pin

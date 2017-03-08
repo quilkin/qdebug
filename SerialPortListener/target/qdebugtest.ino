@@ -1,14 +1,28 @@
 #include "qdebug.h"
 
+int num ;
+float numf;
+float numfn;
+unsigned int numui ;
+char chchch ; 
+unsigned char bytebyte ;
+unsigned long ms ;
+unsigned long ms2 ;
+int anotherInt;
+
+
 void setup() {
   QDebug qdebug;
-
+  ms2 = 100000L;
+  ms = 0;
+  numf = 12.345;
+  numfn = -5.67E-10;
+  num = 66;
+  numui = 44;
+  chchch = 'a';
+  bytebyte = 200;
+ anotherInt = 345;
 }
-unsigned long ms = 0;
-int num = 1;
-unsigned int numui = 0;
-float numf = 0.1;
-char chchch = '\0'; 
 
 int incInt(int iii) {
   int locali = iii*3;
@@ -21,11 +35,11 @@ unsigned int peeky (unsigned int* peeker)
 {
   return *peeker;
 }
+
+
+
 void loop() {
-  numui = 44;
-  numf = 3.45;
-  num = 66;
-  chchch = 'a';
+
   if (millis() - ms > 60)
   {
     numui += 1;
@@ -35,7 +49,7 @@ void loop() {
     num = incInt(num);
     numui += 6;
     num += 7;
-    numf += 0.1;
+    numf *= 100;
     num += 8;
     num = doubleInt(num);
     num += 10;

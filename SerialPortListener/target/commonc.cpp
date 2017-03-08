@@ -60,14 +60,11 @@ void readData(char* string, unsigned char maxlen) {
 
 void getValues() {
   unsigned int instr = 0;
-	unsigned int* peekaddr = 0;
 	unsigned int peeked = 0;
 	readData(inData, 5);
   instr = (unsigned int)strtoul(inData + 1, NULL, 16);
 	if (inData[0] == 'A') {
-		//peekaddr = (unsigned int*)strtoul(inData + 1, NULL, 16);
 		peeked = *(unsigned int*)instr;
-		//printc('A'); printhex4((int)peekaddr);
 		printc('D'); printhex4(peeked); println("");
     return;
 	}

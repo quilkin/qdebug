@@ -28,7 +28,7 @@ namespace ArdDebug
 
         public Breakpoint currentBreakpoint = null;
         public String comString = String.Empty;
-        public UInt16 requestedAddr = 0;
+        //public UInt16 requestedAddr = 0;
         //public static ManualResetEvent waitingForRX = new ManualResetEvent(false);
         //public static object expectedReply = new Object();
         Serial.SerialPortManager spmanager;
@@ -39,6 +39,10 @@ namespace ArdDebug
         /// </summary>
         //public enum Chars : byte { PROGCOUNT_CHAR = 248, TARGET_CHAR, STEPPING_CHAR, ADDRESS_CHAR, DATA_CHAR, NO_CHAR, YES_CHAR };
 
+        // varaible types built in to gcc or typedefs defined by Arduino
+        const string ReservedTypeWords = "signed char unsigned int float double long volatile";
+        const string TypedefWords = "word boolean bool byte uint8_t uint16_t uint32_t uint64_t";
+
 
         #region FILES
 
@@ -48,7 +52,7 @@ namespace ArdDebug
             this.disassembly = disassembly;
             this.varView = variables;
             this.comms = comms;
-            if (openSourceFile())
+            if (parseSourceFile())
             {
 
                 if (OpenDisassembly())
@@ -66,7 +70,7 @@ namespace ArdDebug
         }
 
 
-        private bool openSourceFile()
+        private bool parseSourceFile()
         {
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.Filter = "Arduino files|*.ino";
@@ -80,6 +84,7 @@ namespace ArdDebug
                 disassembly.Items.Clear();
                 varView.Items.Clear();
                 Variables.Clear();
+                MyVariables.Clear();
                 int count = 1;
                 foreach (var line in System.IO.File.ReadLines(ofd.FileName))
                 {
@@ -93,6 +98,61 @@ namespace ArdDebug
                     lvi.SubItems.Add((count++).ToString());
                     lvi.SubItems.Add(untabbed);
                     source.Items.Add(lvi);
+
+                    // see which variables declared here
+                    // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
+
+                    // looking for something like "  int locali = iii*3;"
+                    // or                        "unsigned int ms = 0;"
+                    // or just                  "float numf;"
+                    // or                       "unsigned long ms;"
+                    // or                       "char array[10];"
+                    // but not if there's a function definition here
+                    // and not an assignment e.g. " ms = 3;"
+                    // or                         " array [x] = 3;"
+
+                    string line2 = line;
+                    if (line2.Length < 3)
+                        continue;
+                    if (line2.IndexOf('(') >= 0)
+                        continue;  // function definition....
+                    
+                    int equals = line2.IndexOf('=');
+                    if (equals > 0)
+                    {
+                        // get rid of any assignments made with the var name, not interested at this stage
+                        line2 = line2.Substring(0, equals);
+                    }
+                    char[] delimiters = new char[] { ' ', '[' };
+                    string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts[0].StartsWith("#"))
+                        continue;
+                    if (parts[0].StartsWith("//"))
+                        continue;
+                    if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
+                    {
+                        // should be a variable declaration. Might be local (deal with that later.....)
+                        // find first word that is NOT in the reserved lists
+                        string varName = null;
+                        for (int p = 1; p < parts.Length; p++)
+                        {
+                            string part = parts[p];
+                            if (part.EndsWith(";"))
+                            {
+                                part = part.Substring(0, part.Length - 1);
+                            }
+                            if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
+                            {
+                                continue;
+                            }
+                            varName = part;
+                            break;
+                        }
+                        if (varName != null)
+                        {
+                            MyVariables.Add(varName);
+                        }
+                    }
                 }
                 return true;
             }
@@ -161,11 +221,13 @@ namespace ArdDebug
             startInfo.RedirectStandardOutput = true;
             startInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
-            startInfo.Arguments = "-S -l -C " + elfPath;
+            startInfo.Arguments = "-S -l -C -t " + elfPath;
 
             // disassembly file
             if (doObjDump(startInfo, ".lss") == false)
                 return false;
+            //if (ParseSourceInfo(ShortFilename) == false)
+            //    return false;
             if (ParseDisassembly(ShortFilename + ".lss") == false)
                 return false;
 
@@ -282,6 +344,8 @@ namespace ArdDebug
                     // found something in the previous line
                     if (line.Contains("DW_AT_name"))
                     {
+                        //  could be    "< 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): num1"
+                        //  or          "< 1fa8 > DW_AT_name        : num2"
                         int index = line.LastIndexOf(':');
                         String name = line.Substring(index + 1).Trim();
                         // We're only interested in vars that occur in our own files, not library files
@@ -348,22 +412,23 @@ namespace ArdDebug
                 }
             }
 
-
-
             return true;
         }
+
+        
+
+
         private bool ParseDisassembly(string file)
         {
             int count = 1;
             Breakpoint bp = null;
             int bpCount = 0;
 
+            
             foreach (string line in File.ReadLines(file))
             {
                 ListViewItem lvi = new ListViewItem();
-                //lvi.Text = (count++).ToString();
-                //lvi.SubItems.Add(line.Replace("\t", "    "));
-                // disassembly.Items.Add(lvi);
+
                 if (line.Length < 3)
                     continue;
 
@@ -378,7 +443,8 @@ namespace ArdDebug
 
                         if (ushort.TryParse(strPC, System.Globalization.NumberStyles.HexNumber, null, out progCounter))
                         {
-                            if (++bpCount > 1)// miss out lines before call to qdebug????
+                            //if (++bpCount > 1)// miss out lines before call to qdebug????
+                            ++bpCount;
                             {
                                 bp.SetDetails(progCounter, line);
                                 Breakpoints.Add(bp);
@@ -401,34 +467,9 @@ namespace ArdDebug
                     }
                     else
                     {
-                        // see if there are any variables declared here
-                        // looking for something like "  int locali = iii*3;"
-                        // or                        "unsigned int ms = 0;"
-                        // but not if there's a function definition here
-                        // and not an assignment e.g. " ms = 3;"
-                        int equals = line.IndexOf('=');
-                        int bracket = line.IndexOf('(');
-                        if (bracket < 0 && equals > 0)
-                        {
-                            // should be a variable declaration. Might be local (deal with that later.....)
-                            char[] delimiters = new char[] { ' ' };
-                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length > 3)
-                            {
-                                if (parts[1] != "=")
-                                {
-                                    string varName = null;
-                                    if (parts[2] == "=")
-                                        varName = parts[1];
-                                    else if (parts[3] == "=")
-                                        varName = parts[2];
-                                    if (varName != null)
-                                        MyVariables.Add(varName);
-                                }
-                            }
-                        }
                     }
                 }
+                
                 if (line.Contains(ShortFilename))
                 {
                     // there should be a debuggable line shortly after, e.g.
@@ -575,19 +616,98 @@ namespace ArdDebug
 
 
         }
-
+        //public void newVariableData()
+        //{
+        //    ushort data;
+        //    if (comString.Length < 5)
+        //        return;
+        //    if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
+        //    {
+        //        Variable var = Variables.Find(x => x.Address == requestedAddr);
+        //        if (var.Type.Name == "char")
+        //        {
+        //            // our data has two bytes; we just want the 'first' one
+        //            char ch = (char)(data & 0xFF);
+        //            var.currentValue = "'" + ch + "'";
+        //        }
+        //        else
+        //        {
+        //            var.currentValue = data.ToString();
+        //        }
+        //    }
+        //}
         public void GetVariables()
         {
+            UInt16 requestedAddr = 0;
+            UInt16 data = 0;
+            UInt16 datahi = 0;
+            UInt32 bigdata = 0;
+ 
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
             System.Threading.Thread.Sleep(100);
             foreach (Variable var in Variables)
             {
+
                 requestedAddr = var.Address;
                 sendStr = "A" + requestedAddr.ToString("X4") + "\n";
                 Send(sendStr);
                 comString = ReadLine();
-                newVariableData();
+                
+                if (comString.Length < 5)
+                    continue;
+                if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
+                {
+                   if (var.Type.Size == 1)
+                    {
+                        // our data has two bytes; we just want the 'lowest' one
+                        
+                        if (var.Type.Name == "char")
+                        {
+                            char bite = (char)(data & 0xFF);
+                            var.currentValue = "'" + bite + "'";
+                        }
+                        else
+                        {
+                            byte bite = (byte)(data & 0xFF);
+                            var.currentValue = bite.ToString();
+                        }
+                    }
+                    else
+                    {
+                        var.currentValue = data.ToString();
+                        if (var.Type.Size == 4)
+                        {
+                            // need to get the next two bytes
+                            requestedAddr += 2;
+                            sendStr = "A" + requestedAddr.ToString("X4") + "\n";
+                            Send(sendStr);
+                            comString = ReadLine();
+                            if (comString.Length < 5)
+                                continue;
+                            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
+                            {
+                                bigdata += (UInt32)(datahi<<16) + data;
+                                var.currentValue = bigdata.ToString();
+                                if (var.Type.Name == "float")
+                                {
+                                    byte[] fbytes = BitConverter.GetBytes(bigdata);
+                                    double f = BitConverter.ToSingle(fbytes, 0);
+                                  
+
+                                    //byte* p1 = (byte*)&bigdata;
+                                    //byte* p2 = (byte*)&f;
+                                    //// Copy the bits from the integer variable to a float variable
+                                    //for (byte i = 0; i < 4; i++)
+                                    //    *p2++ = *p1++;
+                                    ////float f = (float)bigdata;
+                                    var.currentValue = f.ToString();
+                                }
+                            }
+
+                        }
+                    }
+                }
             }
             UpdateVariableWindow();
 
@@ -745,26 +865,7 @@ namespace ArdDebug
             item.BackColor = System.Drawing.Color.Orange;
         }
 
-        public void newVariableData()
-        {
-            ushort data;
-            if (comString.Length < 5)
-                return;
-            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
-            {
-                Variable var = Variables.Find(x => x.Address == requestedAddr);
-                if (var.Type.Name == "char")
-                {
-                    // our data has two bytes; we just want the 'first' one
-                    char ch = (char)(data & 0xFF);
-                    var.currentValue = "'" + ch + "'";
-                }
-                else
-                {
-                    var.currentValue = data.ToString();
-                }
-            }
-        }
+
         public string newProgramCounter()
         {
             ushort pc;
