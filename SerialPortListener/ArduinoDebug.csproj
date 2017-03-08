@@ -82,6 +82,15 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <None Include="target\qdebugtest.ino" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="target\commonc.cpp" />
+    <Content Include="target\commonc.h" />
+    <Content Include="target\mySerial.cpp" />
+    <Content Include="target\mySerial.h" />
+    <Content Include="target\qdebug.cpp" />
+    <Content Include="target\qdebug.h" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
