@@ -68,15 +68,12 @@ namespace ArdDebug
 
         private void buttonPause_Click(object sender, EventArgs e)
         {
-            //string message = this.textToSend.Text + '\n';
-            //{
-            //    _spManager.Send(message);
-            //}
+            Arduino._Running.CancelAsync();
+            //Arduino.pauseReqd = true;
         }
         private void buttonStep_Click(object sender, EventArgs e)
         {
             Arduino.SingleStep();
-
         }
 
 

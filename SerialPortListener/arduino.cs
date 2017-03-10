@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Diagnostics;
 using System.Threading;
+using System.ComponentModel;
 
 namespace ArdDebug
 {
@@ -33,6 +34,7 @@ namespace ArdDebug
         //public static object expectedReply = new Object();
         Serial.SerialPortManager spmanager;
 
+        public bool pauseReqd { set; get; }
         /// <summary>
         /// ascii chars used for interaction strings
         /// (can't use under 128 because normal Serial.print will use them)
@@ -73,7 +75,7 @@ namespace ArdDebug
         private bool parseSourceFile()
         {
             OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Filter = "Arduino files|*.ino";
+            ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
             ofd.Title = "Load Arduino Sketch";
             var dialogResult = ofd.ShowDialog();
             if (dialogResult == DialogResult.OK)
@@ -195,23 +197,47 @@ namespace ArdDebug
         private bool OpenDisassembly()
         {
             // find the .elf file corresponding to this sketch
-            string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
+           
             string elfPath = null;
-            bool found = false;
-            foreach (string path in arduinoPaths)
-            {
-                elfPath = path + "\\" + ShortFilename + ".elf";
-                if (File.Exists(elfPath))
+            if (ShortFilename.EndsWith(".ino"))
+            { 
+                string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
+                
+                
+                foreach (string path in arduinoPaths)
                 {
-                    found = true;
-                    break;
+                    elfPath = path + "\\" + ShortFilename + ".elf";
+                    if (File.Exists(elfPath))
+                    {
+                        break;
+                    }
                 }
             }
-            if (!found)
+            else
+            { // non-Arduino (Atmel Studio) project
+                // debug files should be in ..\debug relative to source folder
+                string path = FullFilename;
+                int index = path.IndexOf("\\src\\");
+                if (index > 0)
+                {
+//C: \Users\chris\Documents\Atmel Studio\7.0\MEGA_LED_EXAMPLE1\MEGA_LED_EXAMPLE1\src\mega_led_example.c
+
+                    elfPath = path.Substring(0, index);
+                    int lastSlash = elfPath.LastIndexOf("\\");
+                    string nameRoot = elfPath.Substring(lastSlash + 1);
+
+                    elfPath = elfPath + "\\Debug\\" + nameRoot + ".elf"; ;
+
+                }
+            }
+            if (elfPath == null)
             {
                 MessageBox.Show("No compiled files found. You may need to recompile your project");
                 return false;
             }
+            // in case path includes spces, argument needs quotes
+            elfPath = "\"" + elfPath + "\"";
+
             // Use ProcessStartInfo class
             // objdump - d progcount2.ino.elf > progcount2.ino.lss
             ProcessStartInfo startInfo = new ProcessStartInfo();
@@ -257,17 +283,20 @@ namespace ArdDebug
 
             // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
 
+            // first of all need to find a list of variable types used. Info is in this format:
+            //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
+            //  <6c9>   DW_AT_byte_size   : 2
+            //  <6ca>   DW_AT_encoding    : 5	(signed)
+            //  <6cb>   DW_AT_name        : int
+            VariableTypes.Clear();
+            bool insideDef = false;
             foreach (string line in File.ReadLines(file))
             {
-                // first of all need to find a list of variable types used. Info is in this format:
-                //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
-                //  <6c9>   DW_AT_byte_size   : 2
-                //  <6ca>   DW_AT_encoding    : 5	(signed)
-                //  <6cb>   DW_AT_name        : int
+                
                 if (varType != null)
                 {
                     // found something in the previous line
-
+                    insideDef = true;
                     if (line.Contains("DW_AT_byte_size"))
                     {
                         int index = line.LastIndexOf(':');
@@ -302,7 +331,17 @@ namespace ArdDebug
                     }
 
                 }
-                if (line.Contains("DW_TAG_base_type"))
+                if (insideDef && line.Contains("Abbrev Number"))
+                {
+                    // done with previous definition
+                    if (varType != null)
+                    {
+                        VariableTypes.Add(varType);
+                    }
+                    varType = null;
+                    insideDef = false;
+                }
+                if (line.Contains("DW_TAG_base_type") && insideDef==false)
                 {
                     //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
                     int index1 = line.LastIndexOf('<');
@@ -318,13 +357,8 @@ namespace ArdDebug
                         MessageBox.Show("error parsing variable types.." + line);
                     }
                 }
-                else if (line.Contains("Abbrev Number"))
-                {
-                    // done with previous definition
-                    if (varType != null)
-                        VariableTypes.Add(varType);
-                    varType = null;
-                }
+
+
             }
 
 
@@ -377,7 +411,7 @@ namespace ArdDebug
                     }
                     else if (line.Contains("DW_AT_location"))
                     {
-                        if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_stack_value"))
+                        if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
                         {
                             // local or register var, not dealing with these yet
                             var = null;  // get ready for next one
@@ -394,6 +428,12 @@ namespace ArdDebug
                             Variables.Add(var);
                             ListViewItem lvi = new ListViewItem();
                             lvi.Text = var.Name.ToString();
+                            if (var.Type==null)
+                            {
+                                MessageBox.Show("error parsing variables..." + var.Name + " has no type");
+                                var = null;
+                                continue;
+                            }
                             lvi.SubItems.Add(var.Type.Name);
                             lvi.SubItems.Add(var.Address.ToString("X"));
                             lvi.SubItems.Add(var.currentValue);
@@ -474,13 +514,22 @@ namespace ArdDebug
                 {
                     // there should be a debuggable line shortly after, e.g.
                     ////    C: \Users\chris\Documents\Arduino\sketch_feb26a / sketch_feb26a.ino:31
+                    ////    (or C: \Users\chris\Documents\Atmel Studio\7.0\MEGA_LED_EXAMPLE1\MEGA_LED_EXAMPLE1\Debug /../ src / mega_led_example.c:82(discriminator 1))
                     ////    float f;
                     ////    for (int index = 0; index < 5; index++)
                     ////         790:	1e 82           std Y+6, r1; 0x06  
                     // In this case, line 31 would be a breakpoint, pointing to address 0x0790
                     // We need to parse these lines (from filename line, as far as the line with the address ':')
                     int colon = line.LastIndexOf(':');
-                    string strSourceLine = line.Substring(colon + 1);
+                    int bracket = line.LastIndexOf("(");
+                    string strSourceLine;
+                    if (bracket > 0) {
+                        strSourceLine = line.Substring(colon + 1,bracket-colon-1);
+                    }
+                    else
+                    {
+                        strSourceLine = line.Substring(colon + 1);
+                    }
                     int sourceLine = 0;
                     if (int.TryParse(strSourceLine, out sourceLine))
                     {
@@ -523,6 +572,8 @@ namespace ArdDebug
         {
             if (str == null)
                 return;
+            if (_Running != null && _Running.IsBusy)
+                return;
             int maxTextLength = 1000; // maximum text length in text box
             if (comms.TextLength > maxTextLength)
                 comms.Text = comms.Text.Remove(0, maxTextLength / 2);
@@ -535,18 +586,22 @@ namespace ArdDebug
         private string ReadLine(int timeout)
         {
             string str = spmanager.ReadLine(timeout);
-            UpdateCommsBox(str,false);
+            if (str.Length > 3 )
+                UpdateCommsBox(str,false);
             return str;
         }
         private string ReadLine()
         {
             string str = spmanager.ReadLine();
-            UpdateCommsBox(str,false);
+
+            if (str.Length > 3 )
+                UpdateCommsBox(str,false);
             return str;
         }
         private void Send(string str)
         {
-            UpdateCommsBox(str,true);
+            if (str.Length > 3)
+                UpdateCommsBox(str,true);
             spmanager.Send(str);
         }
         public void Startup(Serial.SerialPortManager _spmanager)
@@ -555,9 +610,9 @@ namespace ArdDebug
             spmanager.StartListening();  // this will reset the Arduino
             comString = null;
             currentBreakpoint = null;
-            Send("startup");
+            Send("startup\n");
             // might take  a while for a reset etc
-            comString = ReadLine(5000);
+            comString = ReadLine(10000);
             GetVariables();
         }
         public void SingleStep()
@@ -590,6 +645,7 @@ namespace ArdDebug
 
         }
 
+        public BackgroundWorker _Running = null;
         public void GoToBreakpoint()
         {
             bool bpFound = false;
@@ -601,11 +657,41 @@ namespace ArdDebug
                     String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
                     Send(sendStr);
                     comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
-                    // now wait for the bp to be hit.....
-                    comString = ReadLine(System.IO.Ports.SerialPort.InfiniteTimeout);  /// ***need to change to successive short timeouts so we can escape
-                    GetVariables();
-                    UpdateVariableWindow();
-                    MarkBreakpointHit(bp);
+                                                // now wait for the bp to be hit.....or a pause command
+                    _Running = new BackgroundWorker();
+                    _Running.WorkerSupportsCancellation = true;
+                   
+                    _Running.DoWork += new DoWorkEventHandler((state, args) =>
+                    {
+                        do
+                        {
+                            comString = ReadLine(); // waiting for "?"...DoWeNeedToStop?
+                            if (comString.Length > 0)
+                            {
+                                if (comString[0] == '?')
+                                {
+                                    //check for pause button just pressed
+                                    if (_Running.CancellationPending)
+                                    {
+                                        Send("X");        // instruction to force targetPC to be equal to current PC
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        Send("N");
+                                    }
+                                }
+                                else // reached predefined breakpoint
+                                    break;
+                            }
+                        } while (true);
+                        GetVariables();
+                        UpdateVariableWindow();
+                        MarkBreakpointHit(bp);
+                    });
+                    _Running.RunWorkerAsync();
+
+
                 }
             }
             if (!bpFound)
@@ -687,7 +773,7 @@ namespace ArdDebug
                                 continue;
                             if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
                             {
-                                bigdata += (UInt32)(datahi<<16) + data;
+                                bigdata = (UInt32)(datahi<<16) + data;
                                 var.currentValue = bigdata.ToString();
                                 if (var.Type.Name == "float")
                                 {
@@ -712,17 +798,7 @@ namespace ArdDebug
             UpdateVariableWindow();
 
         }
-        /// <summary>
-        /// use the list of breakpoint-able lines to determine the next place to 'single-step' to
-        /// </summary>
-        /// <param name="pc">pc at current breakpoint</param>
-        /// <returns>next pc to pause execution</returns>
-        public ushort FindNextPC(ushort pc)
-        {
-            // placeholder only for now
-            return pc;
 
-        }
 
         /// <summary>
         /// use the list of breakpoint-able lines to determine if we are at the next place to 'single-step' to
@@ -740,19 +816,29 @@ namespace ArdDebug
             }
             return false;
         }
-
+        delegate void varViewDelegate();
         void UpdateVariableWindow()
         {
-            // a bit inefficient but will do for now
-            varView.Items.Clear();
-            foreach (Variable var in Variables)
+            if (varView.InvokeRequired)
             {
-                ListViewItem lvi = new ListViewItem();
-                lvi.Text = var.Name.ToString();
-                lvi.SubItems.Add(var.Type.Name);
-                lvi.SubItems.Add("0x" + var.Address.ToString("X4"));
-                lvi.SubItems.Add(var.currentValue);
-                varView.Items.Add(lvi);
+                varViewDelegate d = new varViewDelegate(UpdateVariableWindow);
+                varView.Invoke(d, new object[] { });
+            }
+            else
+            {
+                // a bit inefficient but will do for now
+                varView.Items.Clear();
+                foreach (Variable var in Variables)
+                {
+                    ListViewItem lvi = new ListViewItem();
+                    lvi.Text = var.Name.ToString();
+                    if (var.Type == null)
+                        continue;
+                    lvi.SubItems.Add(var.Type.Name);
+                    lvi.SubItems.Add("0x" + var.Address.ToString("X4"));
+                    lvi.SubItems.Add(var.currentValue);
+                    varView.Items.Add(lvi);
+                }
             }
 
 
@@ -857,12 +943,20 @@ namespace ArdDebug
             }
 
         }
-
+        delegate void bpDelegate(Breakpoint bp);
         private void MarkBreakpointHit(Breakpoint bp)
         {
-            ListView.ListViewItemCollection sourceItems = source.Items;
-            ListViewItem item = sourceItems[bp.SourceLine - 1];
-            item.BackColor = System.Drawing.Color.Orange;
+            if (source.InvokeRequired)
+            {
+                bpDelegate d = new bpDelegate(MarkBreakpointHit);
+                source.Invoke(d, new object[] { bp });
+            }
+            else
+            {
+                ListView.ListViewItemCollection sourceItems = source.Items;
+                ListViewItem item = sourceItems[bp.SourceLine - 1];
+                item.BackColor = System.Drawing.Color.Orange;
+            }
         }
 
 
@@ -888,9 +982,6 @@ namespace ArdDebug
                         //return Chars.NO_CHAR.ToString();
                         return "N";
 
-                    //nextpc = FindNextPC(pc);
-                    //string newString = nextpc.ToString("X");
-                    //return newString;
                 }
                 else
                 {

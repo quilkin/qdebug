@@ -134,7 +134,7 @@ bool areWeAtALine()
 extern "C"
 {
 	__attribute__((used)) void checkhit()  {
-		unsigned int changeTarget = 0;
+		//unsigned int changeTarget = 0;
 
 		switch (dbState) {
 		case BEGIN:
