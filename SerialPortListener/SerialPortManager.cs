@@ -36,7 +36,7 @@ namespace ArdDebug.Serial
 
         public SerialPortManager()
         {
-            _currentSerialSettings.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(_currentSerialSettings_PropertyChanged);
+ //           _currentSerialSettings.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(_currentSerialSettings_PropertyChanged);
             ScanPorts();
             //// Finding installed serial ports on hardware
             //_currentSerialSettings.PortNameCollection = SerialPort.GetPortNames();
@@ -122,12 +122,12 @@ namespace ArdDebug.Serial
 
         #region Event handlers
 
-        void _currentSerialSettings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            // if serial port is changed, a new baud query is issued
-            if (e.PropertyName.Equals("PortName"))
-                UpdateBaudRateCollection();
-        }
+        //void _currentSerialSettings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        //{
+        //    // if serial port is changed, a new baud query is issued
+        //    if (e.PropertyName.Equals("PortName"))
+        //        UpdateBaudRateCollection();
+        //}
 
         
         //void _serialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
@@ -229,20 +229,20 @@ namespace ArdDebug.Serial
         /// <summary>
         /// Retrieves the current selected device's COMMPROP structure, and extracts the dwSettableBaud property
         /// </summary>
-        private void UpdateBaudRateCollection()
-        {
-            try
-            {
-                _serialPort = new SerialPort(_currentSerialSettings.PortName);
-                _serialPort.Open();
-                object p = _serialPort.BaseStream.GetType().GetField("commProp", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_serialPort.BaseStream);
-                Int32 dwSettableBaud = (Int32)p.GetType().GetField("dwSettableBaud", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).GetValue(p);
+        //private void UpdateBaudRateCollection()
+        //{
+        //    try
+        //    {
+        //        _serialPort = new SerialPort(_currentSerialSettings.PortName);
+        //        _serialPort.Open();
+        //        object p = _serialPort.BaseStream.GetType().GetField("commProp", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_serialPort.BaseStream);
+        //        Int32 dwSettableBaud = (Int32)p.GetType().GetField("dwSettableBaud", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).GetValue(p);
 
-                _serialPort.Close();
-                _currentSerialSettings.UpdateBaudRateCollection(dwSettableBaud);
-            }
-            catch { }
-        }
+        //        _serialPort.Close();
+        //        _currentSerialSettings.UpdateBaudRateCollection(dwSettableBaud);
+        //    }
+        //    catch { }
+        //}
 
         // Call to release serial port
         public void Dispose()

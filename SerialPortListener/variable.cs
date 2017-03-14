@@ -29,9 +29,13 @@ namespace ArdDebug
         public int Size { get; set; }
         public int Encoding { get; set; }
         public string EncodingString { get; set; }
-        public VariableType(UInt16 reference)
+
+        public VariableType BaseType { get; set; }
+
+    public VariableType(UInt16 reference)
         {
             Reference = reference;
+            BaseType = null;
         }
     }
 

@@ -101,7 +101,17 @@ namespace ArdDebug
 
         private void buttonRun_Click(object sender, EventArgs e)
         {
-            Arduino.GoToBreakpoint();
+            Arduino.FindBreakpoint();
         }
+
+        private void buttonStepOver_Click(object sender, EventArgs e)
+        {
+            Arduino.StepOver();
+        }
+
+        //private void varView_SelectedIndexChanged(object sender, EventArgs e)
+        //{
+        //    Arduino.ExpandVariable();
+        //}
     }
 }

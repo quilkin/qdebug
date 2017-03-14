@@ -59,6 +59,7 @@
             this.disassemblyView = new System.Windows.Forms.ListView();
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnText = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.buttonStepOver = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
@@ -100,9 +101,9 @@
             this.groupBox1.Controls.Add(baudRateLabel);
             this.groupBox1.Controls.Add(this.btnStop);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Location = new System.Drawing.Point(15, 14);
+            this.groupBox1.Location = new System.Drawing.Point(6, 16);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(185, 104);
+            this.groupBox1.Size = new System.Drawing.Size(180, 104);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Arduino Connection";
@@ -137,7 +138,7 @@
             // 
             // btnStart
             // 
-            this.btnStart.Location = new System.Drawing.Point(682, 11);
+            this.btnStart.Location = new System.Drawing.Point(529, 11);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(97, 23);
             this.btnStart.TabIndex = 12;
@@ -150,11 +151,11 @@
             this.tbData.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tbData.Location = new System.Drawing.Point(834, 195);
+            this.tbData.Location = new System.Drawing.Point(856, 178);
             this.tbData.Multiline = true;
             this.tbData.Name = "tbData";
             this.tbData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbData.Size = new System.Drawing.Size(211, 90);
+            this.tbData.Size = new System.Drawing.Size(189, 129);
             this.tbData.TabIndex = 13;
             // 
             // buttonPause
@@ -170,14 +171,14 @@
             // panel1
             // 
             this.panel1.Controls.Add(this.groupBox1);
-            this.panel1.Location = new System.Drawing.Point(834, 48);
+            this.panel1.Location = new System.Drawing.Point(856, 48);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(211, 132);
+            this.panel1.Size = new System.Drawing.Size(189, 124);
             this.panel1.TabIndex = 17;
             // 
             // buttonRun
             // 
-            this.buttonRun.Location = new System.Drawing.Point(870, 11);
+            this.buttonRun.Location = new System.Drawing.Point(802, 11);
             this.buttonRun.Name = "buttonRun";
             this.buttonRun.Size = new System.Drawing.Size(84, 23);
             this.buttonRun.TabIndex = 18;
@@ -187,7 +188,7 @@
             // 
             // buttonStep
             // 
-            this.buttonStep.Location = new System.Drawing.Point(785, 11);
+            this.buttonStep.Location = new System.Drawing.Point(632, 11);
             this.buttonStep.Name = "buttonStep";
             this.buttonStep.Size = new System.Drawing.Size(79, 23);
             this.buttonStep.TabIndex = 17;
@@ -208,28 +209,32 @@
             this.varView.Location = new System.Drawing.Point(529, 64);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(299, 221);
+            this.varView.Size = new System.Drawing.Size(321, 243);
             this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             this.varView.View = System.Windows.Forms.View.Details;
+            //this.varView.SelectedIndexChanged += new System.EventHandler(this.varView_SelectedIndexChanged);
             // 
             // columnName
             // 
             this.columnName.Text = "Name";
-            this.columnName.Width = 100;
+            this.columnName.Width = 79;
             // 
             // columnType
             // 
             this.columnType.Text = "Type";
+            this.columnType.Width = 76;
             // 
             // columnAddress
             // 
             this.columnAddress.Text = "Addr";
+            this.columnAddress.Width = 44;
             // 
             // columnValue
             // 
             this.columnValue.Text = "Value";
+            this.columnValue.Width = 116;
             // 
             // labelSketch
             // 
@@ -288,9 +293,9 @@
             // 
             // buttonLoad
             // 
-            this.buttonLoad.Location = new System.Drawing.Point(480, 10);
+            this.buttonLoad.Location = new System.Drawing.Point(334, 10);
             this.buttonLoad.Name = "buttonLoad";
-            this.buttonLoad.Size = new System.Drawing.Size(196, 23);
+            this.buttonLoad.Size = new System.Drawing.Size(171, 23);
             this.buttonLoad.TabIndex = 23;
             this.buttonLoad.Text = "Load Sketch";
             this.buttonLoad.UseVisualStyleBackColor = true;
@@ -323,11 +328,22 @@
             this.columnText.Text = "Disassembly";
             this.columnText.Width = 600;
             // 
+            // buttonStepOver
+            // 
+            this.buttonStepOver.Location = new System.Drawing.Point(717, 11);
+            this.buttonStepOver.Name = "buttonStepOver";
+            this.buttonStepOver.Size = new System.Drawing.Size(79, 23);
+            this.buttonStepOver.TabIndex = 25;
+            this.buttonStepOver.Text = "StepOver";
+            this.buttonStepOver.UseVisualStyleBackColor = true;
+            this.buttonStepOver.Click += new System.EventHandler(this.buttonStepOver_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1057, 549);
+            this.Controls.Add(this.buttonStepOver);
             this.Controls.Add(this.buttonRun);
             this.Controls.Add(this.tbData);
             this.Controls.Add(this.disassemblyView);
@@ -382,6 +398,7 @@
         private System.Windows.Forms.ColumnHeader columnAddress;
         private System.Windows.Forms.Button buttonStep;
         private System.Windows.Forms.Button buttonRun;
+        private System.Windows.Forms.Button buttonStepOver;
     }
 }
 

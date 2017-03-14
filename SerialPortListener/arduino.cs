@@ -27,11 +27,17 @@ namespace ArdDebug
         /// </summary>
         private List<String> MyVariables = new List<String>();
 
-        public Breakpoint currentBreakpoint = null;
+        /// <summary>
+        /// where program counter is currently sitting
+        /// </summary>
+        private Breakpoint currentBreakpoint = null;
+        /// <summary>
+        /// next place to stop if we skip over a function call
+        /// </summary>
+        private Breakpoint nextBreakpoint = null;
+
         public String comString = String.Empty;
-        //public UInt16 requestedAddr = 0;
-        //public static ManualResetEvent waitingForRX = new ManualResetEvent(false);
-        //public static object expectedReply = new Object();
+
         Serial.SerialPortManager spmanager;
 
         public bool pauseReqd { set; get; }
@@ -45,6 +51,11 @@ namespace ArdDebug
         const string ReservedTypeWords = "signed char unsigned int float double long volatile";
         const string TypedefWords = "word boolean bool byte uint8_t uint16_t uint32_t uint64_t";
 
+        System.Drawing.Color sourceLineColour = System.Drawing.Color.AliceBlue;
+        System.Drawing.Color breakpointColour = System.Drawing.Color.Red;
+        System.Drawing.Color breakpointHitColour = System.Drawing.Color.Orange;
+
+
 
         #region FILES
 
@@ -54,15 +65,15 @@ namespace ArdDebug
             this.disassembly = disassembly;
             this.varView = variables;
             this.comms = comms;
+            Breakpoints.Clear();
             if (parseSourceFile())
             {
 
                 if (OpenDisassembly())
                 {
-                    // get ready to accept breakpoints
+
                     source.Click += Source_Click;
-                    //source.SelectedIndexChanged += Source_SelectedIndexChanged;
-                    //source.ItemChecked += Source_ItemChecked;
+                    varView.Click += Variable_Click;
                     return true;
                 }
 
@@ -118,7 +129,7 @@ namespace ArdDebug
                         continue;
                     if (line2.IndexOf('(') >= 0)
                         continue;  // function definition....
-                    
+
                     int equals = line2.IndexOf('=');
                     if (equals > 0)
                     {
@@ -127,6 +138,8 @@ namespace ArdDebug
                     }
                     char[] delimiters = new char[] { ' ', '[' };
                     string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 1)
+                        continue;
                     if (parts[0].StartsWith("#"))
                         continue;
                     if (parts[0].StartsWith("//"))
@@ -197,13 +210,13 @@ namespace ArdDebug
         private bool OpenDisassembly()
         {
             // find the .elf file corresponding to this sketch
-           
+
             string elfPath = null;
             if (ShortFilename.EndsWith(".ino"))
-            { 
+            {
                 string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
-                
-                
+
+
                 foreach (string path in arduinoPaths)
                 {
                     elfPath = path + "\\" + ShortFilename + ".elf";
@@ -220,7 +233,7 @@ namespace ArdDebug
                 int index = path.IndexOf("\\src\\");
                 if (index > 0)
                 {
-//C: \Users\chris\Documents\Atmel Studio\7.0\MEGA_LED_EXAMPLE1\MEGA_LED_EXAMPLE1\src\mega_led_example.c
+                    //C: \Users\chris\Documents\Atmel Studio\7.0\MEGA_LED_EXAMPLE1\MEGA_LED_EXAMPLE1\src\mega_led_example.c
 
                     elfPath = path.Substring(0, index);
                     int lastSlash = elfPath.LastIndexOf("\\");
@@ -292,7 +305,7 @@ namespace ArdDebug
             bool insideDef = false;
             foreach (string line in File.ReadLines(file))
             {
-                
+
                 if (varType != null)
                 {
                     // found something in the previous line
@@ -310,7 +323,7 @@ namespace ArdDebug
                     {
                         int index = line.LastIndexOf(':');
                         int enc = 0;
-                        string encStr = line.Substring(index+2,1); // but not 100% sure if these are all < 16 i..e one digit
+                        string encStr = line.Substring(index + 2, 1); // but not 100% sure if these are all < 16 i..e one digit
                         if (int.TryParse(encStr, out enc))
                         {
                             varType.Encoding = enc;
@@ -329,9 +342,35 @@ namespace ArdDebug
                         //VariableTypes.Add(varType);
                         //varType = null;
                     }
+                    else if (line.Contains("DW_AT_type") && varType.BaseType == null)
+                    {
+                        //< 1f63 > DW_AT_type        : < 0x6c7 >        .... this is base type of an array
+                        int index1 = line.LastIndexOf('<');
+                        int index2 = line.LastIndexOf('>');
+                        UInt16 reference = 0;
+                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
+                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                        {
+                            VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
+                            varType.BaseType = baseType;
+                        }
+                    }
+                    else if (line.Contains(" DW_AT_upper_bound"))
+                    {
+                        //< 2 >< 2037 >: Abbrev Number: 30(DW_TAG_subrange_type)
+                        // < 2038 > DW_AT_type        : < 0xae0 >
+                        //  < 203c > DW_AT_upper_bound : 9              ... this provides the size of the array
+                        int index = line.LastIndexOf(':');
+                        string sizeStr = line.Substring(index + 1).Trim();
+                        ushort size = 0;
+                        if (ushort.TryParse(sizeStr, out size))
+                        { 
+                            varType.Size = size + 1;
+                        }
+                    }
 
                 }
-                if (insideDef && line.Contains("Abbrev Number"))
+                if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") ==false)
                 {
                     // done with previous definition
                     if (varType != null)
@@ -341,7 +380,7 @@ namespace ArdDebug
                     varType = null;
                     insideDef = false;
                 }
-                if (line.Contains("DW_TAG_base_type") && insideDef==false)
+                if (line.Contains("DW_TAG_base_type") && insideDef == false)
                 {
                     //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
                     int index1 = line.LastIndexOf('<');
@@ -357,13 +396,36 @@ namespace ArdDebug
                         MessageBox.Show("error parsing variable types.." + line);
                     }
                 }
-
+                if (line.Contains("DW_TAG_array_type") && insideDef == false)
+                {
+                    // < 1 >< 1f62 >: Abbrev Number: 29(DW_TAG_array_type)
+                    //< 1f63 > DW_AT_type        : < 0x6c7 >        .... points to base type
+                    //< 1f67 > DW_AT_sibling     : < 0x1f72 >
+                         //< 2 >< 2037 >: Abbrev Number: 30(DW_TAG_subrange_type)
+                         // < 2038 > DW_AT_type        : < 0xae0 >
+                         //  < 203c > DW_AT_upper_bound : 9
+                    int index1 = line.LastIndexOf('<');
+                    int index2 = line.LastIndexOf('>');
+                    UInt16 reference = 0;
+                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                    {
+                        varType = new VariableType(reference);
+                        varType.Name = "array";
+                    }
+                    else
+                    {
+                        MessageBox.Show("error parsing variable types.." + line);
+                    }
+                }
+                
 
             }
 
 
             // now find the variables themselves. Remove old ones first
             varView.Items.Clear();
+            varView.Sorting = SortOrder.None;
             foreach (string line in File.ReadLines(file))
             {
                 //// looking for info like this, to find location of our variables ('numf' is a global in this example)
@@ -427,14 +489,25 @@ namespace ArdDebug
                             var.Address = (ushort)(loc & 0xFFFF);
                             Variables.Add(var);
                             ListViewItem lvi = new ListViewItem();
+                            lvi.Name = var.Name.ToString();
                             lvi.Text = var.Name.ToString();
-                            if (var.Type==null)
+                            if (var.Type == null)
                             {
                                 MessageBox.Show("error parsing variables..." + var.Name + " has no type");
                                 var = null;
                                 continue;
                             }
-                            lvi.SubItems.Add(var.Type.Name);
+                            string typeName = var.Type.Name;
+                            if (var.Type.BaseType != null)
+                            {
+                                // array type etc
+                                if (var.Type.Name == "array")
+                                {
+                                    typeName += "[]";
+                                    lvi.Text += "[0]";
+                                }
+                            }
+                            lvi.SubItems.Add(typeName);
                             lvi.SubItems.Add(var.Address.ToString("X"));
                             lvi.SubItems.Add(var.currentValue);
                             varView.Items.Add(lvi);
@@ -455,7 +528,37 @@ namespace ArdDebug
             return true;
         }
 
-        
+
+
+        /// <summary>
+        /// Using a line in teh dsisassembly 
+        /// (e.g. C:\Users\chris\Documents\Arduino\qdebugtest/qdebugtest.ino:48)
+        /// find the source lien number at the end
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        private int FindSourceFromDisassembly(string line)
+        {
+            int colon = line.LastIndexOf(':');
+            int bracket = line.LastIndexOf("(");
+            string strSourceLine;
+            if (colon > bracket && bracket > 0)
+                return 0;
+            if (bracket > 0)
+            {
+                strSourceLine = line.Substring(colon + 1, bracket - colon - 1);
+            }
+            else
+            {
+                strSourceLine = line.Substring(colon + 1);
+            }
+            int sourceLine = 0;
+            if (int.TryParse(strSourceLine, out sourceLine))
+            {
+                return sourceLine;
+            }
+            return 0;
+        }
 
 
         private bool ParseDisassembly(string file)
@@ -463,11 +566,13 @@ namespace ArdDebug
             int count = 1;
             Breakpoint bp = null;
             int bpCount = 0;
+            string sourceLinePending = string.Empty;
 
-            
             foreach (string line in File.ReadLines(file))
             {
                 ListViewItem lvi = new ListViewItem();
+                
+                bool lineIsAddress = false;
 
                 if (line.Length < 3)
                     continue;
@@ -494,10 +599,12 @@ namespace ArdDebug
                                 ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
                                 if (sourceItem != null)
                                 {
-                                    sourceItem.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
+                                    sourceItem.BackColor = System.Drawing.Color.AliceBlue;
                                 }
                             }
                             bp = null;
+                            lineIsAddress = true;
+
                         }
                         else
                         {
@@ -509,7 +616,7 @@ namespace ArdDebug
                     {
                     }
                 }
-                
+
                 if (line.Contains(ShortFilename))
                 {
                     // there should be a debuggable line shortly after, e.g.
@@ -520,26 +627,20 @@ namespace ArdDebug
                     ////         790:	1e 82           std Y+6, r1; 0x06  
                     // In this case, line 31 would be a breakpoint, pointing to address 0x0790
                     // We need to parse these lines (from filename line, as far as the line with the address ':')
-                    int colon = line.LastIndexOf(':');
-                    int bracket = line.LastIndexOf("(");
-                    string strSourceLine;
-                    if (bracket > 0) {
-                        strSourceLine = line.Substring(colon + 1,bracket-colon-1);
-                    }
-                    else
-                    {
-                        strSourceLine = line.Substring(colon + 1);
-                    }
-                    int sourceLine = 0;
-                    if (int.TryParse(strSourceLine, out sourceLine))
+                    int sourceLine = FindSourceFromDisassembly(line);
+                     
+                    if (sourceLine>0)
                     {
                         bp = new Breakpoint(ShortFilename, sourceLine);
                     }
+                    // Tag this to next 'addressed' line for later use....
+                    sourceLinePending = line;
+                    continue;
                 }
 
-                if (line[1]==':' && line[2]=='\\')
+                if (line[1] == ':' && line[2] == '\\')
                 {
-                    // name of file, don't need in disassembly
+                    // name of file and source line number. Tag this to next 'addressed' line for later use....
                     continue;
                 }
                 if (line.IndexOf("//") == 0)
@@ -553,9 +654,18 @@ namespace ArdDebug
                     continue;
                 }
                 lvi.Text = (count++).ToString();
-                lvi.SubItems.Add(line.Replace("\t", "    "));
+                string dissLine = line.Replace("\t", "    ");
+                if (sourceLinePending.Length > 0 && lineIsAddress)
+                {
+                    dissLine += " *** ";
+                    dissLine += sourceLinePending;
+                    sourceLinePending = string.Empty;
+
+                }
+                lvi.SubItems.Add(dissLine);
+
                 disassembly.Items.Add(lvi);
- 
+
 
             }
             if (disassembly.Items.Count < 3)
@@ -586,22 +696,22 @@ namespace ArdDebug
         private string ReadLine(int timeout)
         {
             string str = spmanager.ReadLine(timeout);
-            if (str.Length > 3 )
-                UpdateCommsBox(str,false);
+            if (str.Length > 3)
+                UpdateCommsBox(str, false);
             return str;
         }
         private string ReadLine()
         {
             string str = spmanager.ReadLine();
 
-            if (str.Length > 3 )
-                UpdateCommsBox(str,false);
+            if (str.Length > 3)
+                UpdateCommsBox(str, false);
             return str;
         }
         private void Send(string str)
         {
             if (str.Length > 3)
-                UpdateCommsBox(str,true);
+                UpdateCommsBox(str, true);
             spmanager.Send(str);
         }
         public void Startup(Serial.SerialPortManager _spmanager)
@@ -610,6 +720,7 @@ namespace ArdDebug
             spmanager.StartListening();  // this will reset the Arduino
             comString = null;
             currentBreakpoint = null;
+            nextBreakpoint = null;
             Send("startup\n");
             // might take  a while for a reset etc
             comString = ReadLine(10000);
@@ -620,7 +731,7 @@ namespace ArdDebug
             String stepStr = "P0000\n";
             bool continuing = true;
             Send(stepStr);
-            while (continuing) { 
+            while (continuing) {
                 comString = ReadLine();
                 if (comString.Length == 0)
                 {
@@ -639,14 +750,32 @@ namespace ArdDebug
                 {
                     string reply = newProgramCounter();
                     Send(reply);
-                    
+
                 }
             }
 
         }
 
-        public BackgroundWorker _Running = null;
-        public void GoToBreakpoint()
+        /// <summary>
+        /// need to set a temporary breakpoint, avoiding any function calls
+        /// </summary>
+        public void StepOver()
+        {
+            if (nextBreakpoint != null)
+            {
+                //// set up a 'temporary' breakpoint
+                //Breakpoint bp = new Breakpoint("", 0);
+                //bp.ProgramCounter = nextBreakpoint;
+                GoToBreakpoint(nextBreakpoint);
+            }
+            else
+            {
+                MessageBox.Show("Error, no suitable step found");
+            }
+
+        }
+
+        public void FindBreakpoint()
         {
             bool bpFound = false;
             foreach (Breakpoint bp in Breakpoints)
@@ -654,44 +783,8 @@ namespace ArdDebug
                 if (bp.Manual)
                 {
                     bpFound = true;
-                    String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
-                    Send(sendStr);
-                    comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
-                                                // now wait for the bp to be hit.....or a pause command
-                    _Running = new BackgroundWorker();
-                    _Running.WorkerSupportsCancellation = true;
-                   
-                    _Running.DoWork += new DoWorkEventHandler((state, args) =>
-                    {
-                        do
-                        {
-                            comString = ReadLine(); // waiting for "?"...DoWeNeedToStop?
-                            if (comString.Length > 0)
-                            {
-                                if (comString[0] == '?')
-                                {
-                                    //check for pause button just pressed
-                                    if (_Running.CancellationPending)
-                                    {
-                                        Send("X");        // instruction to force targetPC to be equal to current PC
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        Send("N");
-                                    }
-                                }
-                                else // reached predefined breakpoint
-                                    break;
-                            }
-                        } while (true);
-                        GetVariables();
-                        UpdateVariableWindow();
-                        MarkBreakpointHit(bp);
-                    });
-                    _Running.RunWorkerAsync();
-
-
+                    GoToBreakpoint(bp);
+                    break;
                 }
             }
             if (!bpFound)
@@ -699,36 +792,63 @@ namespace ArdDebug
                 MessageBox.Show("No breakpoints set!");
                 return;
             }
+        }
+        public BackgroundWorker _Running = null;
+        public void GoToBreakpoint(Breakpoint bp)
+        {
+            String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
+            Send(sendStr);
+            comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
+                                        // now wait for the bp to be hit.....or a pause command
+            _Running = new BackgroundWorker();
+            _Running.WorkerSupportsCancellation = true;
 
+            _Running.DoWork += new DoWorkEventHandler((state, args) =>
+            {
+                do
+                {
+                    comString = ReadLine(); // waiting for "?"...DoWeNeedToStop?
+                    if (comString.Length > 0)
+                    {
+                        if (comString[0] == '?')
+                        {
+                            //check for pause button just pressed
+                            if (_Running.CancellationPending)
+                            {
+                                Send("X");        // instruction to force targetPC to be equal to current PC
+                                break;
+                            }
+                            else
+                            {
+                                Send("N");
+                            }
+                        }
+                        else // reached predefined breakpoint
+                            break;
+                    }
+                } while (true);
+                GetVariables();
+                UpdateVariableWindow();
+                UpdateCodeWindows(bp.ProgramCounter);
+                MarkBreakpointHit(bp);
+
+            });
+            _Running.RunWorkerAsync();
+        }
+
+
+        public void GetVariable(Variable var)
+        {
 
         }
-        //public void newVariableData()
-        //{
-        //    ushort data;
-        //    if (comString.Length < 5)
-        //        return;
-        //    if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
-        //    {
-        //        Variable var = Variables.Find(x => x.Address == requestedAddr);
-        //        if (var.Type.Name == "char")
-        //        {
-        //            // our data has two bytes; we just want the 'first' one
-        //            char ch = (char)(data & 0xFF);
-        //            var.currentValue = "'" + ch + "'";
-        //        }
-        //        else
-        //        {
-        //            var.currentValue = data.ToString();
-        //        }
-        //    }
-        //}
+
         public void GetVariables()
         {
             UInt16 requestedAddr = 0;
             UInt16 data = 0;
             UInt16 datahi = 0;
             UInt32 bigdata = 0;
- 
+
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
             System.Threading.Thread.Sleep(100);
@@ -739,15 +859,15 @@ namespace ArdDebug
                 sendStr = "A" + requestedAddr.ToString("X4") + "\n";
                 Send(sendStr);
                 comString = ReadLine();
-                
+
                 if (comString.Length < 5)
                     continue;
                 if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
                 {
-                   if (var.Type.Size == 1)
+                    if (var.Type.Size == 1)
                     {
                         // our data has two bytes; we just want the 'lowest' one
-                        
+
                         if (var.Type.Name == "char")
                         {
                             char bite = (char)(data & 0xFF);
@@ -773,20 +893,13 @@ namespace ArdDebug
                                 continue;
                             if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
                             {
-                                bigdata = (UInt32)(datahi<<16) + data;
+                                bigdata = (UInt32)(datahi << 16) + data;
                                 var.currentValue = bigdata.ToString();
                                 if (var.Type.Name == "float")
                                 {
                                     byte[] fbytes = BitConverter.GetBytes(bigdata);
                                     double f = BitConverter.ToSingle(fbytes, 0);
-                                  
 
-                                    //byte* p1 = (byte*)&bigdata;
-                                    //byte* p2 = (byte*)&f;
-                                    //// Copy the bits from the integer variable to a float variable
-                                    //for (byte i = 0; i < 4; i++)
-                                    //    *p2++ = *p1++;
-                                    ////float f = (float)bigdata;
                                     var.currentValue = f.ToString();
                                 }
                             }
@@ -799,6 +912,53 @@ namespace ArdDebug
 
         }
 
+        public void Variable_Click(object sender, EventArgs e)
+        {
+            if (varView.SelectedItems.Count == 0)
+                return;
+            ListViewItem clicked = varView.SelectedItems[0];
+            string itemName = clicked.Name;
+            Variable var = Variables.Find(x => x.Name == itemName);
+            if (var == null)
+                return;
+            if (var.Type.BaseType == null)
+                return;
+            //varView.Sorting = SortOrder.None;
+            if ((string)clicked.Tag != "expanded")
+            {
+                // expand item to show contents of this compound variable
+                int size = var.Type.Size;
+                int index = clicked.Index;
+                ushort addr = var.Address;
+                for (int i = 0; i < size; i++)
+                {
+                    string[] items = { "  " + itemName + '[' + i + ']', var.Type.BaseType.Name, addr.ToString("X4"), i.ToString() };
+                    ListViewItem arrayItem = new ListViewItem(items);
+                    arrayItem.BackColor = System.Drawing.Color.Azure;
+                    arrayItem.Tag = "arrayItem";
+                    varView.Items.Insert(++index,arrayItem);
+                    addr += (ushort)var.Type.BaseType.Size;
+                }
+                clicked.Tag = "expanded";
+            }
+            else
+            {
+                // unexpand the added items
+                ListView.ListViewItemCollection items = varView.Items;
+                foreach (ListViewItem item  in items)
+                {
+                    if ((string) item.Tag == "arrayItem")
+                    {
+                        varView.Items.Remove(item);
+
+                    }
+                }
+                clicked.Tag = "";
+            //    varView.Sorting = SortOrder.Ascending;
+
+            }
+
+        }
 
         /// <summary>
         /// use the list of breakpoint-able lines to determine if we are at the next place to 'single-step' to
@@ -827,69 +987,134 @@ namespace ArdDebug
             else
             {
                 // a bit inefficient but will do for now
-                varView.Items.Clear();
+                //varView.Items.Clear();
                 foreach (Variable var in Variables)
                 {
-                    ListViewItem lvi = new ListViewItem();
-                    lvi.Text = var.Name.ToString();
-                    if (var.Type == null)
+                    ListView.ListViewItemCollection vars = varView.Items;
+                    ListViewItem[] lvis = vars.Find(var.Name,false);
+                    if (lvis == null)
                         continue;
-                    lvi.SubItems.Add(var.Type.Name);
-                    lvi.SubItems.Add("0x" + var.Address.ToString("X4"));
-                    lvi.SubItems.Add(var.currentValue);
-                    varView.Items.Add(lvi);
+                    ListViewItem lvi = lvis[0];
+                   // lvi.Text = var.Name.ToString();
+
+                   // lvi.SubItems.Add(var.Type.Name);
+                    lvi.SubItems[2].Text = "0x" + var.Address.ToString("X4");
+                    lvi.SubItems[3].Text = var.currentValue;
+                    //varView.Items.Add(lvi);
+                    
                 }
             }
-
-
+        }
+        void UpdateCodeWindows(ushort pc)
+        {
+            UpdateDisassembly(pc);
+            UpdateSource();
         }
 
-        void UpdateCodeWindows(ushort pc) {
-            int linecount = 0;
-            if (disassembly != null && disassembly.Visible)
+        delegate void updateDissDelegate(ushort pc);
+        void UpdateDisassembly(ushort pc)
+        {
+            if (disassembly.InvokeRequired)
             {
-                // find a line that starts with [whitespace][pc][:]
-                ListView.ListViewItemCollection disItems = disassembly.Items;
-                string pcStr = pc.ToString("x") + ':';
-                linecount = 0;
-                foreach (ListViewItem disItem in disItems)
+                updateDissDelegate d = new updateDissDelegate(UpdateDisassembly);
+                disassembly.Invoke(d, new object[] { pc });
+            }
+            else
+            {
+                int linecount = 0;
+                nextBreakpoint = null;
+                if (disassembly != null && disassembly.Visible)
                 {
-                    ++linecount;
-                    string line = disItem.SubItems[1].Text;
-                    if (line.Contains(pcStr))
+                    // find a line that starts with [whitespace][pc][:]
+                    ListView.ListViewItemCollection disItems = disassembly.Items;
+                    string pcStr = pc.ToString("x") + ':';
+                    linecount = 0;
+                    bool currentLineFound = false;
+                    int nextSourceLine = 0;
+                    foreach (ListViewItem disItem in disItems)
                     {
-                        int index = disItem.Index;
-                        disassembly.Items[index].Selected = true;
-                        disassembly.Select();
-                        disassembly.EnsureVisible(index);
-                        break;
+                        ++linecount;
+                        string line = disItem.SubItems[1].Text;
+                        if (line.Contains(pcStr) && !currentLineFound)
+                        {
+                            int index = disItem.Index;
+                            disassembly.Items[index].Selected = true;
+                            disassembly.Select();
+                            disassembly.EnsureVisible(index);
+                            currentLineFound = true;
+                        }
+                        else if (currentLineFound)
+                        {
+                            // searching for next source line that we'll need for 'step over' instruction
+                            //  i.e. avoiding any function calls here
+                            //char[] delimiters = new char[] { ' ', ':' };
+                            int starIndex = line.IndexOf(" *** ");
+                            if (starIndex > 0)
+                            {
+                                // this is our added ref to the source code.
+                                string sourceLine = line.Substring(starIndex + 5);
+                                // Try to find corresponding source line in source window
+                                nextSourceLine = FindSourceFromDisassembly(sourceLine);
+                                if (nextSourceLine > 0)
+                                {
+                                    // this will be the next bp for 'step over'
+                                    foreach (Breakpoint bp in Breakpoints)
+                                    {
+                                        if (bp.SourceLine == nextSourceLine)
+                                        {
+                                            nextBreakpoint = bp;
+                                            break;
+                                        }
+                                    }
+                                    // done searching
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
-            if (source == null)
-                return;
-            // find the line that contains the current breakpoint
-            ListView.ListViewItemCollection sourceItems = source.Items;
-            linecount = 0;
-            bool lineFound = false;
-            foreach (ListViewItem sourceItem in sourceItems)
+        }
+
+        delegate void updateSourceDelegate();
+        void UpdateSource()
+        {
+            if (source.InvokeRequired)
             {
-                ++linecount;
-                //string line = sourceItem.SubItems[2].Text;
-                if (currentBreakpoint != null &&  currentBreakpoint.SourceLine == linecount)
-                {
-                    int index = sourceItem.Index;
-                    source.Items[index].Selected = true;
-                    source.Select();
-                    source.EnsureVisible(index);
-                    lineFound = true;
-                    break;
-                }
+                updateSourceDelegate d = new updateSourceDelegate(UpdateSource);
+                source.Invoke(d, new object[] { });
             }
-            if (!lineFound)
+            else
             {
-                source.Items[0].Selected = true;
-                source.EnsureVisible(0);
+                if (source == null)
+                    return;
+                // find the line that contains the current breakpoint
+                ListView.ListViewItemCollection sourceItems = source.Items;
+                int linecount = 0;
+                bool lineFound = false;
+                foreach (ListViewItem sourceItem in sourceItems)
+                {
+                    if (sourceItem.BackColor == breakpointHitColour)
+                    {
+                        sourceItem.BackColor = breakpointColour;
+                    }
+
+                    ++linecount;
+                    if (currentBreakpoint != null && currentBreakpoint.SourceLine == linecount)
+                    {
+                        int index = sourceItem.Index;
+                        source.Items[index].Selected = true;
+                        source.Select();
+                        source.EnsureVisible(index);
+                        lineFound = true;
+                        break;
+                    }
+                }
+                if (!lineFound)
+                {
+                    source.Items[0].Selected = true;
+                    source.EnsureVisible(0);
+                }
             }
 
         }
@@ -901,46 +1126,59 @@ namespace ArdDebug
 
             if (source.SelectedItems.Count == 0)
                 return;
-            ListView.ListViewItemCollection sourceItems = source.Items;
             ListViewItem lvi = source.SelectedItems[0];
+            ListView.ListViewItemCollection sourceItems = source.Items;
 
+            // clear any previous breakpoints
+            foreach (Breakpoint bp in Breakpoints)
+            {
+                ListViewItem bpItem = sourceItems[bp.SourceLine - 1];
+               // if (bp.SourceLine == sourceItems.Find + 1)
+                {
+                    bp.Manual = false;
+                    bpItem.BackColor = sourceLineColour;
+                }
+            }
+           
             // set a new breakpoint (only 1 bp allowed for now....)
 
-
-            if (lvi.SubItems[0].BackColor == System.Drawing.Color.AliceBlue) // i.e. breakpoint possible on this line
+            if (lvi.BackColor == sourceLineColour) // i.e. breakpoint possible on this line
             {
-
                 // now need to find the correct (single-step) breakpoint and make it manual
                 foreach (Breakpoint bp in Breakpoints)
                 {
                     if (bp.SourceLine == lvi.Index + 1)
                     {
-                        if (lvi.BackColor == System.Drawing.Color.Red || lvi.BackColor == System.Drawing.Color.Orange)
-                        {
-                            //bp already set; unset it
-                            bp.Manual = false;
-                            lvi.BackColor = System.Drawing.Color.White;
-                            lvi.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
-                        }
-                        else
-                        {
-                            bp.Manual = true;
-                            lvi.Selected = false;
-                            lvi.BackColor = System.Drawing.Color.Red;
+                        //if (lvi.BackColor == System.Drawing.Color.Red || lvi.BackColor == System.Drawing.Color.Orange)
+                        //{
+                        //    //bp already set; unset it
+                        //    bp.Manual = false;
+                        //    lvi.BackColor = System.Drawing.Color.White;
+                        //    lvi.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
+                        //}
+                        //else
+                        //{
+                        bp.Manual = true;
+                        lvi.Selected = false;
+                        lvi.BackColor = breakpointColour;
 
-                        }
-                    }
-
-                    else
-                    {
-
-                        bp.Manual = false;
-                        ListViewItem item = sourceItems[bp.SourceLine - 1];
-                        item.BackColor = System.Drawing.Color.White;
-                        item.SubItems[0].BackColor = System.Drawing.Color.AliceBlue;
+                        //}
                     }
                 }
             }
+
+            //else
+            //{
+            //    // now need to find the correct (single-step) breakpoint and undo it
+            //    foreach (Breakpoint bp in Breakpoints)
+            //    {
+            //        if (bp.SourceLine == lvi.Index + 1)
+            //        {
+            //            bp.Manual = false;
+            //            lvi.BackColor = System.Drawing.Color.AliceBlue;
+            //        }
+            //    }
+            //}
 
         }
         delegate void bpDelegate(Breakpoint bp);
@@ -953,9 +1191,20 @@ namespace ArdDebug
             }
             else
             {
-                ListView.ListViewItemCollection sourceItems = source.Items;
-                ListViewItem item = sourceItems[bp.SourceLine - 1];
-                item.BackColor = System.Drawing.Color.Orange;
+                if (bp.SourceLine > 1)
+                {
+                    int index = bp.SourceLine - 1;
+                    ListView.ListViewItemCollection sourceItems = source.Items;
+                    ListViewItem item = sourceItems[index];
+                    item.BackColor = breakpointHitColour;
+                    source.EnsureVisible(index);
+
+                    if (source.SelectedItems.Count == 1)
+                    {
+                        item = source.SelectedItems[0];
+                        item.Selected = false;
+                    }
+                }
             }
         }
 
