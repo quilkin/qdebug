@@ -214,7 +214,6 @@
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             this.varView.View = System.Windows.Forms.View.Details;
-            //this.varView.SelectedIndexChanged += new System.EventHandler(this.varView_SelectedIndexChanged);
             // 
             // columnName
             // 
@@ -229,7 +228,7 @@
             // columnAddress
             // 
             this.columnAddress.Text = "Addr";
-            this.columnAddress.Width = 44;
+            this.columnAddress.Width = 57;
             // 
             // columnValue
             // 

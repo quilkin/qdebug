@@ -58,9 +58,11 @@ namespace ArdDebug
         /// </summary>
         public UInt16 Address { get; set; }
         public string currentValue { get; set; }
-
-        public Variable()
+        private Arduino arduino;
+        private String comString = String.Empty;
+        public Variable(Arduino ard)
         {
+            arduino = ard;
             currentValue = string.Empty;
         }
 
@@ -70,8 +72,71 @@ namespace ArdDebug
         //    Address = addr;
 
         //}
-        
-        
-       }
+        public void GetValue()
+        {
+             UInt16 requestedAddr = 0;
+            UInt16 data = 0;
+            UInt16 datahi = 0;
+            UInt32 bigdata = 0;
+            String sendStr;
+
+            requestedAddr = Address;
+            sendStr = "A" + requestedAddr.ToString("X4") + "\n";
+            arduino.Send(sendStr);
+            comString = arduino.ReadLine();
+
+            if (comString.Length < 5)
+                return ;
+
+            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
+            {
+                if (Type.Size == 1)
+                {
+                    // our data has two bytes; we just want the 'lowest' one
+
+                    if (Type.Name == "char")
+                    {
+                        char bite = (char)(data & 0xFF);
+                        currentValue = "'" + bite + "'";
+                    }
+                    else
+                    {
+                        byte bite = (byte)(data & 0xFF);
+                        currentValue = bite.ToString();
+                    }
+                }
+                else
+                {
+                    currentValue = data.ToString();
+                    if (Type.Size == 4)
+                    {
+                        // need to get the next two bytes
+                        requestedAddr += 2;
+                        sendStr = "A" + requestedAddr.ToString("X4") + "\n";
+                        arduino.Send(sendStr);
+                        comString = arduino.ReadLine();
+                        if (comString.Length < 5)
+                            return;
+                        if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
+                        {
+                            bigdata = (UInt32)(datahi << 16) + data;
+                            currentValue = bigdata.ToString();
+                            if (Type.Name == "float")
+                            {
+                                byte[] fbytes = BitConverter.GetBytes(bigdata);
+                                double f = BitConverter.ToSingle(fbytes, 0);
+
+                                currentValue = f.ToString();
+                            }
+                        }
+
+                    }
+                }
+            }
+            //return currentValue;
+        }
+
     }
+}
+
 
