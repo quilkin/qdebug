@@ -24,8 +24,10 @@ namespace ArdDebug
                 Variables.Clear();
                 MyVariables.Clear();
                 int count = 1;
+                int SerialLine = 0;
                 foreach (var line in System.IO.File.ReadLines(ofd.FileName))
                 {
+
                     // tabs ('\t') seem ignored in listview so replace with spaces
                     string untabbed = line.Replace("\t", "    ");
                     string trimmed = line.Trim();
@@ -36,6 +38,7 @@ namespace ArdDebug
                     lvi.SubItems.Add((count++).ToString());
                     lvi.SubItems.Add(untabbed);
                     source.Items.Add(lvi);
+
 
                     // see which variables declared here
                     // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
@@ -48,12 +51,21 @@ namespace ArdDebug
                     // but not if there's a function definition here
                     // and not an assignment e.g. " ms = 3;"
                     // or                         " array [x] = 3;"
-
+                    int index = line.IndexOf("Serial.");
+                    int comment = line.IndexOf("//");
+                    if (index >= 0)
+                    {
+                        if ( comment < 0 || comment > index)
+                        {
+                            lvi.BackColor = System.Drawing.Color.Yellow;
+                            SerialLine = lvi.Index;
+                        }
+                    }
                     string line2 = line;
                     if (line2.Length < 3)
                         continue;
                     if (line2.IndexOf('(') >= 0)
-                        continue;  // function definition....
+                        continue;  // function call or definition, not a variable
 
                     int equals = line2.IndexOf('=');
                     if (equals > 0)
@@ -69,6 +81,7 @@ namespace ArdDebug
                         continue;
                     if (parts[0].StartsWith("//"))
                         continue;
+
                     if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
                     {
                         // should be a variable declaration. Might be local (deal with that later.....)
@@ -93,6 +106,12 @@ namespace ArdDebug
                             MyVariables.Add(varName);
                         }
                     }
+                }
+                if (SerialLine > 0)
+                {
+                    source.EnsureVisible(SerialLine);
+                    MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
+                    return false;
                 }
                 return true;
             }
@@ -455,8 +474,8 @@ namespace ArdDebug
                         }
                         else
                         {
-                            // might happen .....
-                            MessageBox.Show("confusing debug line? " + line);
+                            // might happen ..... lables and public: etc
+                            // MessageBox.Show("confusing debug line? " + line);
                         };
                     }
                     else

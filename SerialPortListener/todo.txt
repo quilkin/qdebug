@@ -1,6 +1,11 @@
 ﻿typedef
 three breakpoints
-array
+//array
 //step over
 check that there is a connection
 goto:
+public: (etc)
+no variables => prog won't start
+//pause not recovering
+//breakpoint setting still not correct
+higher baudrate?

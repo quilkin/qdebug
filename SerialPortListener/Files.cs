@@ -25,7 +25,7 @@ namespace ArdDebug
 
                 if (OpenDisassembly())
                 {
-
+                    source.Click -= Source_Click;
                     source.Click += Source_Click;
                     varView.FullRowSelect = true;
                     varView.Click -= Variable_Click;
@@ -133,7 +133,7 @@ namespace ArdDebug
             startInfo.RedirectStandardOutput = true;
             startInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
-            startInfo.Arguments = "-S -l -C -t " + elfPath;
+            startInfo.Arguments = "-S -l -C " + elfPath;
 
             // disassembly file
             if (doObjDump(startInfo, ".lss") == false)

@@ -162,7 +162,7 @@ namespace ArdDebug
                                         // now wait for the bp to be hit.....or a pause command
             _Running = new BackgroundWorker();
             _Running.WorkerSupportsCancellation = true;
-
+            bool pauseReqd = false;
             _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
                 do
@@ -176,6 +176,7 @@ namespace ArdDebug
                             if (_Running.CancellationPending)
                             {
                                 Send("X");        // instruction to force targetPC to be equal to current PC
+                                pauseReqd = true;
                                 break;
                             }
                             else
@@ -187,77 +188,18 @@ namespace ArdDebug
                             break;
                     }
                 } while (true);
+                Thread.Sleep(100);
                 GetVariables();
+                SingleStep();  // not sure why this is needed; variables don't update otherwise
                 UpdateVariableWindow();
                 UpdateCodeWindows(bp.ProgramCounter);
-                MarkBreakpointHit(bp);
+                if (!pauseReqd)
+                    MarkBreakpointHit(bp);
 
             });
             _Running.RunWorkerAsync();
         }
-
-
-        //public void GetVariable(Variable var)
-        //{
-        //    UInt16 requestedAddr = 0;
-        //    UInt16 data = 0;
-        //    UInt16 datahi = 0;
-        //    UInt32 bigdata = 0;
-        //    String sendStr;
-
-        //    requestedAddr = var.Address;
-        //    sendStr = "A" + requestedAddr.ToString("X4") + "\n";
-        //    Send(sendStr);
-        //    comString = ReadLine();
-
-        //    if (comString.Length < 5)
-        //        return;
-        //    if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
-        //    {
-        //        if (var.Type.Size == 1)
-        //        {
-        //            // our data has two bytes; we just want the 'lowest' one
-
-        //            if (var.Type.Name == "char")
-        //            {
-        //                char bite = (char)(data & 0xFF);
-        //                var.currentValue = "'" + bite + "'";
-        //            }
-        //            else
-        //            {
-        //                byte bite = (byte)(data & 0xFF);
-        //                var.currentValue = bite.ToString();
-        //            }
-        //        }
-        //        else
-        //        {
-        //            var.currentValue = data.ToString();
-        //            if (var.Type.Size == 4)
-        //            {
-        //                // need to get the next two bytes
-        //                requestedAddr += 2;
-        //                sendStr = "A" + requestedAddr.ToString("X4") + "\n";
-        //                Send(sendStr);
-        //                comString = ReadLine();
-        //                if (comString.Length < 5)
-        //                    return;
-        //                if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
-        //                {
-        //                    bigdata = (UInt32)(datahi << 16) + data;
-        //                    var.currentValue = bigdata.ToString();
-        //                    if (var.Type.Name == "float")
-        //                    {
-        //                        byte[] fbytes = BitConverter.GetBytes(bigdata);
-        //                        double f = BitConverter.ToSingle(fbytes, 0);
-
-        //                        var.currentValue = f.ToString();
-        //                    }
-        //                }
-
-        //            }
-        //        }
-        //    }
-        //}
+        
     
 
         public void GetVariables()
@@ -507,33 +449,49 @@ namespace ArdDebug
             // clear any previous breakpoints
             foreach (Breakpoint bp in Breakpoints)
             {
-                ListViewItem bpItem = sourceItems[bp.SourceLine - 1];
-               // if (bp.SourceLine == sourceItems.Find + 1)
+                if (bp.Manual)
                 {
                     bp.Manual = false;
-                    bpItem.BackColor = sourceLineColour;
+                    ListViewItem bpItem = sourceItems[bp.SourceLine - 1];
+                     bpItem.BackColor = sourceLineColour;
+
                 }
             }
-           
+
             // set a new breakpoint (only 1 bp allowed for now....)
 
             if (lvi.BackColor == sourceLineColour) // i.e. breakpoint possible on this line
             {
-                // now need to find the correct (single-step) breakpoint and make it manual
+                // now need to find the correct (single-step) breakpoint and make it manual 
                 foreach (Breakpoint bp in Breakpoints)
                 {
                     if (bp.SourceLine == lvi.Index + 1)
                     {
 
-                        bp.Manual = true;
-                        lvi.Selected = false;
-                        lvi.BackColor = breakpointColour;
+                            bp.Manual = true;
+                            lvi.Selected = false;
+                            lvi.BackColor = breakpointColour;
 
                     }
                 }
             }
+            //else if (lvi.BackColor == breakpointColour || lvi.BackColor == breakpointHitColour) // i.e. breakpoint possible on this line
+            //{
+            //    // now need to find the correct (single-step) breakpoint and make it not manual 
+            //    foreach (Breakpoint bp in Breakpoints)
+            //    {
+            //        if (bp.SourceLine == lvi.Index + 1)
+            //        {
+  
+            //                // undoing a previous breakpoint
+            //                bp.Manual = false;
+            //                lvi.Selected = false;
+            //                lvi.BackColor = sourceLineColour;
+            //         }
+            //    }
+            //}
 
-   
+
         }
         delegate void bpDelegate(Breakpoint bp);
         private void MarkBreakpointHit(Breakpoint bp)

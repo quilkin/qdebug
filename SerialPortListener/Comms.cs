@@ -14,6 +14,8 @@ namespace ArdDebug
     {
         private void UpdateCommsBox(string str, bool sending)
         {
+            if (comms.Visible == false)
+                return;
             if (str == null)
                 return;
             if (_Running != null && _Running.IsBusy)
@@ -38,7 +40,7 @@ namespace ArdDebug
         {
             string str = spmanager.ReadLine();
 
-            if (str.Length > 3)
+            //if (str.Length > 3)
                 UpdateCommsBox(str, false);
             return str;
         }
@@ -46,7 +48,9 @@ namespace ArdDebug
         {
             if (spmanager == null)
                 return;
-            if (str.Length > 3)
+            if (str == null)
+                return;
+            //if (str.Length > 3)
                 UpdateCommsBox(str, true);
             spmanager.Send(str);
         }
