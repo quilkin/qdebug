@@ -12,7 +12,12 @@ namespace ArdDebug
 {
     partial class Arduino
     {
+        public Arduino(Panel stopled, Panel runled)
+        {
+            this.stopLED = stopled;
+            this.runLED = runled;
 
+        }
         private ListView source, disassembly, varView;
         private TextBox comms;
         public String ShortFilename { private set; get; }
@@ -35,7 +40,7 @@ namespace ArdDebug
         /// next place to stop if we skip over a function call
         /// </summary>
         private Breakpoint nextBreakpoint = null;
-
+        private Panel stopLED, runLED;
         public String comString = String.Empty;
 
         Serial.SerialPortManager spmanager;
@@ -75,6 +80,7 @@ namespace ArdDebug
 
         public void Startup(Serial.SerialPortManager _spmanager)
         {
+            Leds(true);
             this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
             comString = null;
@@ -82,14 +88,37 @@ namespace ArdDebug
             nextBreakpoint = null;
             Send("startup\n");
             // might take  a while for a reset etc
-            comString = ReadLine(10000);
+            comString = ReadLine(5000);
+            if (comString.Length < 2)
+            {
+                MessageBox.Show("Cannot find device, please check connection");
+                Leds(false);
+                return;
+            }
             GetVariables();
+            SingleStep();
+            Leds(false);
+        }
+
+        private void Leds(bool running)
+        {
+            if (running)
+            {
+                runLED.BackColor = System.Drawing.Color.LimeGreen;
+                stopLED.BackColor = System.Drawing.Color.DarkRed;
+            }
+            else
+            {
+                runLED.BackColor = System.Drawing.Color.DarkGreen;
+                stopLED.BackColor = System.Drawing.Color.Red;
+            }
         }
         public void SingleStep()
         {
             String stepStr = "P0000\n";
             bool continuing = true;
             Send(stepStr);
+            Leds(true);
             while (continuing)
             {
                 comString = ReadLine();
@@ -113,7 +142,7 @@ namespace ArdDebug
 
                 }
             }
-
+            Leds(false);
         }
 
         /// <summary>
@@ -121,6 +150,7 @@ namespace ArdDebug
         /// </summary>
         public void StepOver()
         {
+            Leds(true);
             if (nextBreakpoint != null)
             {
                 //// set up a 'temporary' breakpoint
@@ -132,7 +162,7 @@ namespace ArdDebug
             {
                 MessageBox.Show("Error, no suitable step found");
             }
-
+            Leds(false);
         }
 
         public void FindBreakpoint()
@@ -163,6 +193,7 @@ namespace ArdDebug
             _Running = new BackgroundWorker();
             _Running.WorkerSupportsCancellation = true;
             bool pauseReqd = false;
+            Leds(true);
             _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
                 do
@@ -188,13 +219,15 @@ namespace ArdDebug
                             break;
                     }
                 } while (true);
-                Thread.Sleep(100);
+                Thread.Sleep(100); //allow time for target to catch up
                 GetVariables();
-                SingleStep();  // not sure why this is needed; variables don't update otherwise
+                if (pauseReqd)
+                    SingleStep();  // not sure why this is needed; variables don't update otherwise
                 UpdateVariableWindow();
                 UpdateCodeWindows(bp.ProgramCounter);
                 if (!pauseReqd)
                     MarkBreakpointHit(bp);
+                Leds(false);
 
             });
             _Running.RunWorkerAsync();
@@ -204,7 +237,7 @@ namespace ArdDebug
 
         public void GetVariables()
         {
-  
+            Leds(true);
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
             System.Threading.Thread.Sleep(100);
@@ -214,6 +247,7 @@ namespace ArdDebug
                 var.GetValue();
             }
             UpdateVariableWindow();
+            Leds(false);
         }
 
         public void Variable_Click(object sender, EventArgs e)

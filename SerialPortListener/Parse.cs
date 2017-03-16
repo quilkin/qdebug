@@ -25,12 +25,15 @@ namespace ArdDebug
                 MyVariables.Clear();
                 int count = 1;
                 int SerialLine = 0;
+                bool qdebugHeaderFound = false;
+                bool qdebugConstrFound = false;
                 foreach (var line in System.IO.File.ReadLines(ofd.FileName))
                 {
 
                     // tabs ('\t') seem ignored in listview so replace with spaces
                     string untabbed = line.Replace("\t", "    ");
                     string trimmed = line.Trim();
+
 
                     ListViewItem lvi = new ListViewItem();
                     lvi.Text = ""; // for breakpoint markers
@@ -39,6 +42,8 @@ namespace ArdDebug
                     lvi.SubItems.Add(untabbed);
                     source.Items.Add(lvi);
 
+                    //if (line.Contains("QDebug"))
+                    //    qdebugConstrFound = true;
 
                     // see which variables declared here
                     // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
@@ -78,9 +83,16 @@ namespace ArdDebug
                     if (parts.Length < 1)
                         continue;
                     if (parts[0].StartsWith("#"))
+                    {
+                        if (line.Contains("qdebug.h"))
+                            qdebugHeaderFound = true;
                         continue;
+                    }
                     if (parts[0].StartsWith("//"))
                         continue;
+
+                    if (line.Contains("QDebug"))
+                        qdebugConstrFound = true;
 
                     if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
                     {
@@ -113,6 +125,17 @@ namespace ArdDebug
                     MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
                     return false;
                 }
+                if ( qdebugHeaderFound == false)
+                {
+                    MessageBox.Show("You must #include \"qdebug.h\" at the top of your file");
+                    return false;
+                }
+                if (qdebugConstrFound == false)
+                {
+                    MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
+                    return false;
+                }
+
                 return true;
             }
             return false;

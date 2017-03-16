@@ -28,7 +28,7 @@ namespace ArdDebug
         private void UserInitialization()
         {
             _spManager = new SerialPortManager();
-            Arduino = new Arduino();
+            Arduino = new Arduino(this.panel2Running,this.panelStopped);
 
             SerialSettings mySerialSettings = _spManager.CurrentSerialSettings;
             serialSettingsBindingSource.DataSource = mySerialSettings;
@@ -107,6 +107,26 @@ namespace ArdDebug
         private void buttonStepOver_Click(object sender, EventArgs e)
         {
             Arduino.StepOver();
+        }
+
+        private void buttonComms_Click(object sender, EventArgs e)
+        {
+            tbData.Visible = !tbData.Visible;
+        }
+
+        private void buttonDiss_Click(object sender, EventArgs e)
+        {
+            disassemblyView.Visible = !disassemblyView.Visible;
+            if (disassemblyView.Visible)
+            {
+                varView.Height = 270;
+            }
+            else
+            {
+                varView.Height = 470;
+            }
+            varView.Refresh();
+           
         }
 
         //private void varView_SelectedIndexChanged(object sender, EventArgs e)

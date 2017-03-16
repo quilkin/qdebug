@@ -60,6 +60,10 @@
             this.columnNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnText = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.buttonStepOver = new System.Windows.Forms.Button();
+            this.buttonComms = new System.Windows.Forms.Button();
+            this.buttonDiss = new System.Windows.Forms.Button();
+            this.panelStopped = new System.Windows.Forms.Panel();
+            this.panel2Running = new System.Windows.Forms.Panel();
             baudRateLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
@@ -101,7 +105,7 @@
             this.groupBox1.Controls.Add(baudRateLabel);
             this.groupBox1.Controls.Add(this.btnStop);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Location = new System.Drawing.Point(6, 16);
+            this.groupBox1.Location = new System.Drawing.Point(6, 3);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(180, 104);
             this.groupBox1.TabIndex = 11;
@@ -151,16 +155,17 @@
             this.tbData.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tbData.Location = new System.Drawing.Point(856, 178);
+            this.tbData.Location = new System.Drawing.Point(856, 234);
             this.tbData.Multiline = true;
             this.tbData.Name = "tbData";
             this.tbData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tbData.Size = new System.Drawing.Size(189, 129);
+            this.tbData.Size = new System.Drawing.Size(189, 99);
             this.tbData.TabIndex = 13;
+            this.tbData.Visible = false;
             // 
             // buttonPause
             // 
-            this.buttonPause.Location = new System.Drawing.Point(962, 11);
+            this.buttonPause.Location = new System.Drawing.Point(970, 10);
             this.buttonPause.Name = "buttonPause";
             this.buttonPause.Size = new System.Drawing.Size(72, 23);
             this.buttonPause.TabIndex = 15;
@@ -171,9 +176,9 @@
             // panel1
             // 
             this.panel1.Controls.Add(this.groupBox1);
-            this.panel1.Location = new System.Drawing.Point(856, 48);
+            this.panel1.Location = new System.Drawing.Point(856, 64);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(189, 124);
+            this.panel1.Size = new System.Drawing.Size(189, 108);
             this.panel1.TabIndex = 17;
             // 
             // buttonRun
@@ -209,7 +214,7 @@
             this.varView.Location = new System.Drawing.Point(529, 64);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(321, 243);
+            this.varView.Size = new System.Drawing.Size(321, 467);
             this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
@@ -309,13 +314,14 @@
             this.disassemblyView.FullRowSelect = true;
             this.disassemblyView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.disassemblyView.HideSelection = false;
-            this.disassemblyView.Location = new System.Drawing.Point(529, 313);
+            this.disassemblyView.Location = new System.Drawing.Point(529, 339);
             this.disassemblyView.MultiSelect = false;
             this.disassemblyView.Name = "disassemblyView";
-            this.disassemblyView.Size = new System.Drawing.Size(516, 218);
+            this.disassemblyView.Size = new System.Drawing.Size(516, 192);
             this.disassemblyView.TabIndex = 24;
             this.disassemblyView.UseCompatibleStateImageBehavior = false;
             this.disassemblyView.View = System.Windows.Forms.View.Details;
+            this.disassemblyView.Visible = false;
             // 
             // columnNum
             // 
@@ -337,11 +343,55 @@
             this.buttonStepOver.UseVisualStyleBackColor = true;
             this.buttonStepOver.Click += new System.EventHandler(this.buttonStepOver_Click);
             // 
+            // buttonComms
+            // 
+            this.buttonComms.Location = new System.Drawing.Point(856, 178);
+            this.buttonComms.Name = "buttonComms";
+            this.buttonComms.Size = new System.Drawing.Size(186, 23);
+            this.buttonComms.TabIndex = 26;
+            this.buttonComms.Text = "Show/Hide Comms";
+            this.buttonComms.UseVisualStyleBackColor = true;
+            this.buttonComms.Click += new System.EventHandler(this.buttonComms_Click);
+            // 
+            // buttonDiss
+            // 
+            this.buttonDiss.Location = new System.Drawing.Point(856, 207);
+            this.buttonDiss.Name = "buttonDiss";
+            this.buttonDiss.Size = new System.Drawing.Size(186, 23);
+            this.buttonDiss.TabIndex = 27;
+            this.buttonDiss.Text = "Show/Hide Disassembly";
+            this.buttonDiss.UseVisualStyleBackColor = true;
+            this.buttonDiss.Click += new System.EventHandler(this.buttonDiss_Click);
+            // 
+            // panelStopped
+            // 
+            this.panelStopped.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
+            this.panelStopped.BackColor = System.Drawing.Color.Red;
+            this.panelStopped.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.panelStopped.Location = new System.Drawing.Point(899, 16);
+            this.panelStopped.Name = "panelStopped";
+            this.panelStopped.Size = new System.Drawing.Size(22, 18);
+            this.panelStopped.TabIndex = 28;
+            // 
+            // panel2Running
+            // 
+            this.panel2Running.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
+            this.panel2Running.BackColor = System.Drawing.Color.DarkGreen;
+            this.panel2Running.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.panel2Running.Location = new System.Drawing.Point(934, 16);
+            this.panel2Running.Name = "panel2Running";
+            this.panel2Running.Size = new System.Drawing.Size(22, 18);
+            this.panel2Running.TabIndex = 29;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1057, 549);
+            this.Controls.Add(this.panel2Running);
+            this.Controls.Add(this.panelStopped);
+            this.Controls.Add(this.buttonDiss);
+            this.Controls.Add(this.buttonComms);
             this.Controls.Add(this.buttonStepOver);
             this.Controls.Add(this.buttonRun);
             this.Controls.Add(this.tbData);
@@ -398,6 +448,10 @@
         private System.Windows.Forms.Button buttonStep;
         private System.Windows.Forms.Button buttonRun;
         private System.Windows.Forms.Button buttonStepOver;
+        private System.Windows.Forms.Button buttonComms;
+        private System.Windows.Forms.Button buttonDiss;
+        private System.Windows.Forms.Panel panelStopped;
+        private System.Windows.Forms.Panel panel2Running;
     }
 }
 
