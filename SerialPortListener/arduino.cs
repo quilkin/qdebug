@@ -188,7 +188,7 @@ namespace ArdDebug
         {
             String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
             Send(sendStr);
-            comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
+           // comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
                                         // now wait for the bp to be hit.....or a pause command
             _Running = new BackgroundWorker();
             _Running.WorkerSupportsCancellation = true;

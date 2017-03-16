@@ -222,7 +222,8 @@ namespace ArdDebug.Serial
         /// </summary>
         public void StopListening()
         {
-            _serialPort.Close();
+            if (_serialPort != null)
+              _serialPort.Close();
         }
 
 

@@ -2,8 +2,8 @@
 three breakpoints
 //array
 //step over
-check that there is a connection
+//check that there is a connection
 //goto:
 //public: (etc)
-no variables => prog won't start
 higher baudrate?
+add pause to single-step

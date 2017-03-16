@@ -125,12 +125,12 @@ namespace ArdDebug
                     MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
                     return false;
                 }
-                if ( qdebugHeaderFound == false)
+                if ( qdebugHeaderFound == false && ShortFilename.EndsWith(".ino"))
                 {
                     MessageBox.Show("You must #include \"qdebug.h\" at the top of your file");
                     return false;
                 }
-                if (qdebugConstrFound == false)
+                if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
                 {
                     MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
                     return false;
