@@ -20,25 +20,38 @@ namespace ArdDebug
             this.varView = variables;
             this.comms = comms;
             Breakpoints.Clear();
-            if (parseSourceFile())
+            if (OpenSourceFile())
             {
-
-                if (OpenDisassembly())
+                if (parseSourceFile())
                 {
-                    source.Click -= Source_Click;
-                    source.Click += Source_Click;
-                    varView.FullRowSelect = true;
-                    varView.Click -= Variable_Click;
-                    varView.Click += Variable_Click;
+                    if (OpenDisassembly())
+                    {
+                        source.Click -= Source_Click;
+                        source.Click += Source_Click;
+                        varView.FullRowSelect = true;
+                        varView.Click -= Variable_Click;
+                        varView.Click += Variable_Click;
 
-                    return true;
+                        return true;
+                    }
+
                 }
-
             }
             MessageBox.Show("Problem opening files");
             return false;
         }
-
+        public bool ReOpenFile()
+        {
+            if (parseSourceFile())
+            {
+                if (OpenDisassembly())
+                {
+                    return true;
+                }
+            }
+            MessageBox.Show("Problem opening files");
+            return false;
+        }
 
         private bool doObjDump(ProcessStartInfo startInfo, string fileExt)
         {
@@ -76,21 +89,30 @@ namespace ArdDebug
         private bool OpenDisassembly()
         {
             // find the .elf file corresponding to this sketch
+            // if more than one, use the latest
 
             string elfPath = null;
+            string tryElfPath = null;
+
             if (ShortFilename.EndsWith(".ino"))
             {
                 string[] arduinoPaths = Directory.GetDirectories(Path.GetTempPath(), "arduino_build_*");
 
-
+                DateTime newestFile = DateTime.MinValue;
                 foreach (string path in arduinoPaths)
                 {
-                    elfPath = path + "\\" + ShortFilename + ".elf";
-                    if (File.Exists(elfPath))
+                    tryElfPath = path + "\\" + ShortFilename + ".elf";
+                    if (File.Exists(tryElfPath))
                     {
-                        break;
+                        DateTime fdate = File.GetLastWriteTime(tryElfPath);
+                        if (fdate > newestFile)
+                        {
+                            newestFile = fdate;
+                            elfPath = tryElfPath;
+                        }
                     }
                 }
+
             }
             else
             { // non-Arduino (Atmel Studio) project
@@ -133,7 +155,7 @@ namespace ArdDebug
             startInfo.RedirectStandardOutput = true;
             startInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
-            startInfo.Arguments = "-S -l -C " + elfPath;
+            startInfo.Arguments = "-S -l -C -t " + elfPath;
 
             // disassembly file
             if (doObjDump(startInfo, ".lss") == false)

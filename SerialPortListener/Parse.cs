@@ -7,8 +7,7 @@ namespace ArdDebug
 {
     partial class Arduino
     {
-
-        private bool parseSourceFile()
+        private bool OpenSourceFile()
         {
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
@@ -18,6 +17,21 @@ namespace ArdDebug
             {
                 ShortFilename = ofd.SafeFileName;
                 FullFilename = ofd.FileName;
+                return true;
+            }
+            return false;
+        }
+
+        private bool parseSourceFile()
+        {
+            //OpenFileDialog ofd = new OpenFileDialog();
+            //ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
+            //ofd.Title = "Load Arduino Sketch";
+            //var dialogResult = ofd.ShowDialog();
+            //if (dialogResult == DialogResult.OK)
+            //{
+            //    ShortFilename = ofd.SafeFileName;
+            //    FullFilename = ofd.FileName;
                 source.Items.Clear();
                 disassembly.Items.Clear();
                 varView.Items.Clear();
@@ -27,7 +41,7 @@ namespace ArdDebug
                 int SerialLine = 0;
                 bool qdebugHeaderFound = false;
                 bool qdebugConstrFound = false;
-                foreach (var line in System.IO.File.ReadLines(ofd.FileName))
+                foreach (var line in System.IO.File.ReadLines(FullFilename))
                 {
 
                     // tabs ('\t') seem ignored in listview so replace with spaces
@@ -137,8 +151,7 @@ namespace ArdDebug
                 }
 
                 return true;
-            }
-            return false;
+
         }
 
         private bool ParseDebugInfo(string file)

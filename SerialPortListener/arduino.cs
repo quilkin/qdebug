@@ -12,12 +12,20 @@ namespace ArdDebug
 {
     partial class Arduino
     {
-        public Arduino(Panel stopled, Panel runled)
+        public Arduino(MainForm form)
         {
-            this.stopLED = stopled;
-            this.runLED = runled;
+            this.stopLED = form.LedStopped;
+            this.runLED = form.LedStopped;
+            this.btnPause = form.Pause;
+            this.btnRun = form.Run;
+            this.btnStart = form.Start;
+            this.btnStep= form.Step;
+            this.btnStepOver = form.StepOver;
+            GUI = form;
+            GUI.RunButtons(false);
 
         }
+        private MainForm GUI;
         private ListView source, disassembly, varView;
         private TextBox comms;
         public String ShortFilename { private set; get; }
@@ -41,7 +49,8 @@ namespace ArdDebug
         /// </summary>
         private Breakpoint nextBreakpoint = null;
         private Panel stopLED, runLED;
-        public String comString = String.Empty;
+        private String comString = String.Empty;
+        private Button btnStart, btnStep, btnStepOver, btnRun, btnPause;
 
         Serial.SerialPortManager spmanager;
 
@@ -78,9 +87,17 @@ namespace ArdDebug
         System.Drawing.Color breakpointColour = System.Drawing.Color.Red;
         System.Drawing.Color breakpointHitColour = System.Drawing.Color.Orange;
 
+        //private void RunButtons(bool enabled)
+        //{
+        //    btnStep.Enabled =  enabled;
+        //    btnStepOver.Enabled = enabled;
+        //    btnRun.Enabled = enabled;
+        //}
         public void Startup(Serial.SerialPortManager _spmanager)
         {
             Leds(true);
+            //btnPause.Enabled = false;
+            GUI.RunButtons(false);
             this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
             comString = null;
@@ -98,6 +115,7 @@ namespace ArdDebug
             GetVariables();
             SingleStep();
             Leds(false);
+            GUI.RunButtons(true);
         }
 
         private void Leds(bool running)
@@ -116,33 +134,51 @@ namespace ArdDebug
         public void SingleStep()
         {
             String stepStr = "P0000\n";
-            bool continuing = true;
+            //bool continuing = true;
             Send(stepStr);
             Leds(true);
-            while (continuing)
+            GUI.RunButtons(false);
+            // make this a backgroud task so that we can abort, if required, with the 'pause' button
+            _Running = new BackgroundWorker();
+            _Running.WorkerSupportsCancellation = true;
+            _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
-                comString = ReadLine();
-                if (comString.Length == 0)
+                do
                 {
-                    MessageBox.Show("timeout in single step");
-                    break;
-                }
-                char firstChar = comString[0];
-                if (firstChar == 'P')
-                {
-                    // moved to where we need; this is our 'step'
-                    continuing = false;
-                    newProgramCounter();
-                    GetVariables();
-                }
-                else if (firstChar == 'S')
-                {
-                    string reply = newProgramCounter();
-                    Send(reply);
+                    comString = ReadLine();
+                    if (comString.Length == 0)
+                    {
+                        MessageBox.Show("timeout in single step");
+                        break;
+                    }
+                    if (_Running.CancellationPending)
+                    {
+                        // force device to think it's reached its target
+                        Send("Y");
+                        break;
+                    }
+                    char firstChar = comString[0];
+                    if (firstChar == 'P')
+                    {
+                        // moved to where we need; this is our 'step'
+                        //continuing = false;
+                        newProgramCounter();
+                        GetVariables();
+                        break;
+                    }
+                    else if (firstChar == 'S')
+                    {
+                        string reply = newProgramCounter();
+                        Send(reply);
 
+                    }
                 }
-            }
-            Leds(false);
+                while (true);
+                Leds(false);
+                GUI.RunButtons(true);
+            });
+            _Running.RunWorkerAsync();
+
         }
 
         /// <summary>
@@ -151,6 +187,7 @@ namespace ArdDebug
         public void StepOver()
         {
             Leds(true);
+            GUI.RunButtons(false);
             if (nextBreakpoint != null)
             {
                 //// set up a 'temporary' breakpoint
@@ -163,6 +200,7 @@ namespace ArdDebug
                 MessageBox.Show("Error, no suitable step found");
             }
             Leds(false);
+            GUI.RunButtons(true);
         }
 
         public void FindBreakpoint()
@@ -194,6 +232,7 @@ namespace ArdDebug
             _Running.WorkerSupportsCancellation = true;
             bool pauseReqd = false;
             Leds(true);
+            GUI.RunButtons(false);
             _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
                 do
@@ -228,7 +267,7 @@ namespace ArdDebug
                 if (!pauseReqd)
                     MarkBreakpointHit(bp);
                 Leds(false);
-
+                GUI.RunButtons(true);
             });
             _Running.RunWorkerAsync();
         }
@@ -238,6 +277,7 @@ namespace ArdDebug
         public void GetVariables()
         {
             Leds(true);
+            GUI.RunButtons(false);
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
             System.Threading.Thread.Sleep(100);
@@ -248,6 +288,7 @@ namespace ArdDebug
             }
             UpdateVariableWindow();
             Leds(false);
+            GUI.RunButtons(true);
         }
 
         public void Variable_Click(object sender, EventArgs e)

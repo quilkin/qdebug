@@ -7,3 +7,5 @@ three breakpoints
 //public: (etc)
 higher baudrate?
 add pause to single-step
+enable & disable buttons
+

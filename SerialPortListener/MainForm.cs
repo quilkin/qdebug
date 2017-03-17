@@ -24,11 +24,20 @@ namespace ArdDebug
             UserInitialization();
         }
 
+        // controls need by Arduino logic
+        public Panel LedRunning { get { return panelRunning; } }
+        public Panel LedStopped { get { return panelStopped; } }
+        public Button Start     {  get { return btnStart; } }
+        public Button Step      { get { return buttonStep; } }
+        public Button StepOver  { get { return buttonStepOver; } }
+        public Button Run       { get { return buttonRun; } }
+        public Button Pause     { get { return buttonPause; } }
 
         private void UserInitialization()
         {
             _spManager = new SerialPortManager();
-            Arduino = new Arduino(this.panel2Running,this.panelStopped);
+
+            Arduino = new Arduino(this);
 
             SerialSettings mySerialSettings = _spManager.CurrentSerialSettings;
             serialSettingsBindingSource.DataSource = mySerialSettings;
@@ -38,6 +47,22 @@ namespace ArdDebug
             this.FormClosing += new FormClosingEventHandler(MainForm_FormClosing);
         }
 
+        delegate void buttonDelegate(bool enabled);
+        public void RunButtons(bool enabled)
+        {
+            if (buttonStep.InvokeRequired)
+            {
+                buttonDelegate d = new buttonDelegate(RunButtons);
+                buttonStep.Invoke(d, new object[] { enabled });
+            }
+            else
+            {
+                buttonStep.Enabled = enabled;
+                buttonStepOver.Enabled = enabled;
+                buttonRun.Enabled = enabled;
+                buttonPause.Enabled = !enabled;
+            }
+        }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -45,7 +70,6 @@ namespace ArdDebug
         }
 
 
-        // Handles the "Start Listening"-buttom click event
         private void btnStart_Click(object sender, EventArgs e)
         {
             if (disassemblyView.Items.Count < 10)
@@ -57,6 +81,7 @@ namespace ArdDebug
             
 
             Arduino.Startup(_spManager);
+
 
         }
 
@@ -77,19 +102,18 @@ namespace ArdDebug
         }
 
 
-        private void portNameComboBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
-
-
         private void buttonLoad_Click(object sender, EventArgs e)
         {
             if (Arduino.OpenFiles(this.sourceView,this.disassemblyView,this.varView,this.tbData))
             {
                 this.labelSketch.Text = Arduino.FullFilename;
-            }
-            
+            }        
+        }
+
+        private void buttonReload_Click(object sender, EventArgs e)
+        {
+            Arduino.ReOpenFile();
+            RunButtons(false);
         }
 
         private void buttonScan_Click(object sender, EventArgs e)
@@ -129,9 +153,6 @@ namespace ArdDebug
            
         }
 
-        //private void varView_SelectedIndexChanged(object sender, EventArgs e)
-        //{
-        //    Arduino.ExpandVariable();
-        //}
+
     }
 }

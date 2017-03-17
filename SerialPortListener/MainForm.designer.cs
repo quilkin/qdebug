@@ -63,7 +63,8 @@
             this.buttonComms = new System.Windows.Forms.Button();
             this.buttonDiss = new System.Windows.Forms.Button();
             this.panelStopped = new System.Windows.Forms.Panel();
-            this.panel2Running = new System.Windows.Forms.Panel();
+            this.panelRunning = new System.Windows.Forms.Panel();
+            this.buttonReload = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
@@ -165,7 +166,7 @@
             // 
             // buttonPause
             // 
-            this.buttonPause.Location = new System.Drawing.Point(970, 10);
+            this.buttonPause.Location = new System.Drawing.Point(970, 11);
             this.buttonPause.Name = "buttonPause";
             this.buttonPause.Size = new System.Drawing.Size(72, 23);
             this.buttonPause.TabIndex = 15;
@@ -243,7 +244,7 @@
             // labelSketch
             // 
             this.labelSketch.AutoSize = true;
-            this.labelSketch.Location = new System.Drawing.Point(19, 15);
+            this.labelSketch.Location = new System.Drawing.Point(12, 48);
             this.labelSketch.Name = "labelSketch";
             this.labelSketch.Size = new System.Drawing.Size(64, 13);
             this.labelSketch.TabIndex = 20;
@@ -252,7 +253,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(526, 48);
+            this.label2.Location = new System.Drawing.Point(776, 48);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(74, 13);
             this.label2.TabIndex = 21;
@@ -268,10 +269,10 @@
             this.sourceView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
             this.sourceView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.sourceView.Location = new System.Drawing.Point(12, 40);
+            this.sourceView.Location = new System.Drawing.Point(12, 64);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(493, 491);
+            this.sourceView.Size = new System.Drawing.Size(493, 467);
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -297,11 +298,11 @@
             // 
             // buttonLoad
             // 
-            this.buttonLoad.Location = new System.Drawing.Point(334, 10);
+            this.buttonLoad.Location = new System.Drawing.Point(15, 11);
             this.buttonLoad.Name = "buttonLoad";
             this.buttonLoad.Size = new System.Drawing.Size(171, 23);
             this.buttonLoad.TabIndex = 23;
-            this.buttonLoad.Text = "Load Sketch";
+            this.buttonLoad.Text = "Load New Sketch";
             this.buttonLoad.UseVisualStyleBackColor = true;
             this.buttonLoad.Click += new System.EventHandler(this.buttonLoad_Click);
             // 
@@ -368,27 +369,38 @@
             this.panelStopped.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
             this.panelStopped.BackColor = System.Drawing.Color.Red;
             this.panelStopped.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panelStopped.Location = new System.Drawing.Point(899, 16);
+            this.panelStopped.Location = new System.Drawing.Point(899, 12);
             this.panelStopped.Name = "panelStopped";
-            this.panelStopped.Size = new System.Drawing.Size(22, 18);
+            this.panelStopped.Size = new System.Drawing.Size(22, 22);
             this.panelStopped.TabIndex = 28;
             // 
-            // panel2Running
+            // panelRunning
             // 
-            this.panel2Running.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
-            this.panel2Running.BackColor = System.Drawing.Color.DarkGreen;
-            this.panel2Running.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panel2Running.Location = new System.Drawing.Point(934, 16);
-            this.panel2Running.Name = "panel2Running";
-            this.panel2Running.Size = new System.Drawing.Size(22, 18);
-            this.panel2Running.TabIndex = 29;
+            this.panelRunning.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
+            this.panelRunning.BackColor = System.Drawing.Color.DarkGreen;
+            this.panelRunning.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.panelRunning.Location = new System.Drawing.Point(934, 12);
+            this.panelRunning.Name = "panelRunning";
+            this.panelRunning.Size = new System.Drawing.Size(22, 22);
+            this.panelRunning.TabIndex = 29;
+            // 
+            // buttonReload
+            // 
+            this.buttonReload.Location = new System.Drawing.Point(334, 12);
+            this.buttonReload.Name = "buttonReload";
+            this.buttonReload.Size = new System.Drawing.Size(171, 23);
+            this.buttonReload.TabIndex = 30;
+            this.buttonReload.Text = "ReLoad Sketch";
+            this.buttonReload.UseVisualStyleBackColor = true;
+            this.buttonReload.Click += new System.EventHandler(this.buttonReload_Click);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1057, 549);
-            this.Controls.Add(this.panel2Running);
+            this.Controls.Add(this.buttonReload);
+            this.Controls.Add(this.panelRunning);
             this.Controls.Add(this.panelStopped);
             this.Controls.Add(this.buttonDiss);
             this.Controls.Add(this.buttonComms);
@@ -451,7 +463,8 @@
         private System.Windows.Forms.Button buttonComms;
         private System.Windows.Forms.Button buttonDiss;
         private System.Windows.Forms.Panel panelStopped;
-        private System.Windows.Forms.Panel panel2Running;
+        private System.Windows.Forms.Panel panelRunning;
+        private System.Windows.Forms.Button buttonReload;
     }
 }
 
