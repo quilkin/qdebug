@@ -42,6 +42,11 @@ namespace ArdDebug
         }
         public bool ReOpenFile()
         {
+            if (source == null)
+            {
+                MessageBox.Show("No existing sketch loaded");
+                return false;
+            }
             if (parseSourceFile())
             {
                 if (OpenDisassembly())

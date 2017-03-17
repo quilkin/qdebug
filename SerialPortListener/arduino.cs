@@ -72,7 +72,7 @@ namespace ArdDebug
             "long",
             "volatile"
         };
-        public readonly IList<string> TypedefWords = new List<string> {
+        public  IList<string> TypedefWords = new List<string> {
             "word",
             "boolean",
             "bool",

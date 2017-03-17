@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.IO;
-
+using System.Collections.Generic;
 
 namespace ArdDebug
 {
@@ -24,133 +24,149 @@ namespace ArdDebug
 
         private bool parseSourceFile()
         {
-            //OpenFileDialog ofd = new OpenFileDialog();
-            //ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
-            //ofd.Title = "Load Arduino Sketch";
-            //var dialogResult = ofd.ShowDialog();
-            //if (dialogResult == DialogResult.OK)
-            //{
-            //    ShortFilename = ofd.SafeFileName;
-            //    FullFilename = ofd.FileName;
-                source.Items.Clear();
-                disassembly.Items.Clear();
-                varView.Items.Clear();
-                Variables.Clear();
-                MyVariables.Clear();
-                int count = 1;
-                int SerialLine = 0;
-                bool qdebugHeaderFound = false;
-                bool qdebugConstrFound = false;
-                foreach (var line in System.IO.File.ReadLines(FullFilename))
+           // List<string> TypeDefWords = new List<string>();
+
+            source.Items.Clear();
+            disassembly.Items.Clear();
+            varView.Items.Clear();
+            Variables.Clear();
+            MyVariables.Clear();
+            int count = 1;
+            int SerialLine = 0;
+            bool qdebugHeaderFound = false;
+            bool qdebugConstrFound = false;
+            foreach (var line in System.IO.File.ReadLines(FullFilename))
+            {
+
+                // tabs ('\t') seem ignored in listview so replace with spaces
+                string untabbed = line.Replace("\t", "    ");
+                string trimmed = line.Trim();
+
+
+                ListViewItem lvi = new ListViewItem();
+                lvi.Text = ""; // for breakpoint markers
+
+                lvi.SubItems.Add((count++).ToString());
+                lvi.SubItems.Add(untabbed);
+                source.Items.Add(lvi);
+
+                //if (line.Contains("QDebug"))
+                //    qdebugConstrFound = true;
+
+                // see which variables declared here
+                // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
+
+                // looking for something like "  int locali = iii*3;"
+                // or                        "unsigned int ms = 0;"
+                // or just                  "float numf;"
+                // or                       "unsigned long ms;"
+                // or                       "char array[10];"
+                // but not if there's a function definition here
+                // and not an assignment e.g. " ms = 3;"
+                // or                         " array [x] = 3;"
+                int index = line.IndexOf("Serial.");
+                int comment = line.IndexOf("//");
+                if (index >= 0)
                 {
-
-                    // tabs ('\t') seem ignored in listview so replace with spaces
-                    string untabbed = line.Replace("\t", "    ");
-                    string trimmed = line.Trim();
-
-
-                    ListViewItem lvi = new ListViewItem();
-                    lvi.Text = ""; // for breakpoint markers
-
-                    lvi.SubItems.Add((count++).ToString());
-                    lvi.SubItems.Add(untabbed);
-                    source.Items.Add(lvi);
-
-                    //if (line.Contains("QDebug"))
-                    //    qdebugConstrFound = true;
-
-                    // see which variables declared here
-                    // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
-
-                    // looking for something like "  int locali = iii*3;"
-                    // or                        "unsigned int ms = 0;"
-                    // or just                  "float numf;"
-                    // or                       "unsigned long ms;"
-                    // or                       "char array[10];"
-                    // but not if there's a function definition here
-                    // and not an assignment e.g. " ms = 3;"
-                    // or                         " array [x] = 3;"
-                    int index = line.IndexOf("Serial.");
-                    int comment = line.IndexOf("//");
-                    if (index >= 0)
+                    if ( comment < 0 || comment > index)
                     {
-                        if ( comment < 0 || comment > index)
+                        lvi.BackColor = System.Drawing.Color.Yellow;
+                        SerialLine = lvi.Index;
+                    }
+                }
+                string line2 = line;
+                if (line2.Length < 3)
+                    continue;
+                if (line2.IndexOf('(') >= 0)
+                    continue;  // function call or definition, not a variable
+
+                int equals = line2.IndexOf('=');
+                if (equals > 0)
+                {
+                    // get rid of any assignments made with the var name, not interested at this stage
+                    line2 = line2.Substring(0, equals);
+                }
+                char[] delimiters = new char[] { ' ', '[' };
+                string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 1)
+                    continue;
+                if (parts[0].StartsWith("#"))
+                {
+                    if (line.Contains("qdebug.h"))
+                        qdebugHeaderFound = true;
+                    continue;
+                }
+                if (parts[0].StartsWith("//"))
+                    continue;
+
+                if (parts[0] == "typedef")
+                {
+                    // should be a typedef declaration.
+                    // find first following word that is NOT in the reserved lists
+                    string typeName = null;
+                    for (int p = 1; p < parts.Length; p++)
+                    {
+                        string part = parts[p];
+                        if (part.EndsWith(";"))
                         {
-                            lvi.BackColor = System.Drawing.Color.Yellow;
-                            SerialLine = lvi.Index;
+                            part = part.Substring(0, part.Length - 1);
                         }
-                    }
-                    string line2 = line;
-                    if (line2.Length < 3)
-                        continue;
-                    if (line2.IndexOf('(') >= 0)
-                        continue;  // function call or definition, not a variable
-
-                    int equals = line2.IndexOf('=');
-                    if (equals > 0)
-                    {
-                        // get rid of any assignments made with the var name, not interested at this stage
-                        line2 = line2.Substring(0, equals);
-                    }
-                    char[] delimiters = new char[] { ' ', '[' };
-                    string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 1)
-                        continue;
-                    if (parts[0].StartsWith("#"))
-                    {
-                        if (line.Contains("qdebug.h"))
-                            qdebugHeaderFound = true;
-                        continue;
-                    }
-                    if (parts[0].StartsWith("//"))
-                        continue;
-
-                    if (line.Contains("QDebug"))
-                        qdebugConstrFound = true;
-
-                    if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
-                    {
-                        // should be a variable declaration. Might be local (deal with that later.....)
-                        // find first word that is NOT in the reserved lists
-                        string varName = null;
-                        for (int p = 1; p < parts.Length; p++)
+                        if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
                         {
-                            string part = parts[p];
-                            if (part.EndsWith(";"))
-                            {
-                                part = part.Substring(0, part.Length - 1);
-                            }
-                            if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
-                            {
-                                continue;
-                            }
-                            varName = part;
-                            break;
+                            continue;
                         }
-                        if (varName != null)
+                        typeName = part;
+                        TypedefWords.Add(typeName);
+                        break;
+                    }
+
+                }
+                if (line.Contains("QDebug"))
+                    qdebugConstrFound = true;
+
+                if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
+                {
+                    // should be a variable declaration. Might be local (deal with that later.....)
+                    // find first word that is NOT in the reserved lists
+                    string varName = null;
+                    for (int p = 1; p < parts.Length; p++)
+                    {
+                        string part = parts[p];
+                        if (part.EndsWith(";"))
                         {
-                            MyVariables.Add(varName);
+                            part = part.Substring(0, part.Length - 1);
                         }
+                        if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
+                        {
+                            continue;
+                        }
+                        varName = part;
+                        break;
+                    }
+                    if (varName != null)
+                    {
+                        MyVariables.Add(varName);
                     }
                 }
-                if (SerialLine > 0)
-                {
-                    source.EnsureVisible(SerialLine);
-                    MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
-                    return false;
-                }
-                if ( qdebugHeaderFound == false && ShortFilename.EndsWith(".ino"))
-                {
-                    MessageBox.Show("You must #include \"qdebug.h\" at the top of your file");
-                    return false;
-                }
-                if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
-                {
-                    MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
-                    return false;
-                }
+            }
+            if (SerialLine > 0)
+            {
+                source.EnsureVisible(SerialLine);
+                MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
+                return false;
+            }
+            if (qdebugHeaderFound == false && ShortFilename.EndsWith(".ino"))
+            {
+                MessageBox.Show("You must #include \"qdebug.h\" at the top of your file");
+                return false;
+            }
+            if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
+            {
+                MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
+                return false;
+            }
 
-                return true;
+            return true;
 
         }
 
@@ -243,6 +259,81 @@ namespace ArdDebug
 
 
             }
+
+            // find typedefs next
+            //  for now, we will effectively promote a typedef type to it's base type
+
+ //< 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
+ //       < 6e1 > DW_AT_name        : (indirect string, offset: 0x37a): uint8_t
+ //       < 6e5 > DW_AT_decl_file   : 14
+ //       < 6e6 > DW_AT_decl_line   : 126
+ //       < 6e7 > DW_AT_type        : < 0x6eb >
+    
+ //    < 1 >< 6eb >: Abbrev Number: 2(DW_TAG_base_type)
+ //           < 6ec > DW_AT_byte_size   : 1
+ //           < 6ed > DW_AT_encoding    : 8(unsigned char)
+ //           < 6ee > DW_AT_name        : (indirect string, offset: 0x480): unsigned char
+            insideDef = false;
+            foreach (string line in File.ReadLines(file))
+            {
+                if (varType != null)
+                {
+                    // found something in the previous line
+                    insideDef = true;
+                    if (line.Contains("DW_AT_name"))
+                    {
+                        int index = line.LastIndexOf(':');
+                        varType.Name = line.Substring(index + 1).Trim();
+                    }
+                    else if (line.Contains("DW_AT_type") /* && varType.BaseType == null */)
+                    {
+                        int index1 = line.LastIndexOf('<');
+                        int index2 = line.LastIndexOf('>');
+                        UInt16 reference = 0;
+                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
+                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                        {
+                            VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
+                            //varType.BaseType = baseType;
+                            varType.Encoding = baseType.Encoding;
+                            varType.Size = baseType.Size;
+              
+                        }
+                    }
+                }
+
+                if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") == false)
+                {
+                    // done with previous definition
+                    if (varType != null)
+                    {
+                        VariableTypes.Add(varType);
+                    }
+                    varType = null;
+                    insideDef = false;
+                }
+                if (line.Contains("DW_TAG_typedef") && insideDef == false)
+                {
+                    //    < 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
+                    int index1 = line.LastIndexOf('<');
+                    int index2 = line.LastIndexOf('>');
+                    UInt16 reference = 0;
+                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                    {
+                        varType = new VariableType(reference);
+                    }
+                    else
+                    {
+                        MessageBox.Show("error parsing variable types.." + line);
+                    }
+                }
+
+            }
+
+
+
+
             // find Array types next
             insideDef = false;
             foreach (string line in File.ReadLines(file))
