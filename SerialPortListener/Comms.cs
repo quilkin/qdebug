@@ -31,6 +31,8 @@ namespace ArdDebug
 
         public string ReadLine(int timeout)
         {
+            if (spmanager == null)
+                return null;
             string str = spmanager.ReadLine(timeout);
             if (str.Length > 3)
                 UpdateCommsBox(str, false);
@@ -38,6 +40,8 @@ namespace ArdDebug
         }
         public string ReadLine()
         {
+            if (spmanager == null)
+                return null;
             string str = spmanager.ReadLine();
 
             //if (str.Length > 3)

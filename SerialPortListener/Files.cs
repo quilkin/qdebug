@@ -31,7 +31,7 @@ namespace ArdDebug
                         varView.FullRowSelect = true;
                         varView.Click -= Variable_Click;
                         varView.Click += Variable_Click;
-
+                        varView.Enabled = false;
                         return true;
                     }
 
@@ -171,7 +171,7 @@ namespace ArdDebug
                 return false;
 
             // debug info file
-            startInfo.Arguments = "-Wi " + elfPath;
+            startInfo.Arguments = "-Wil " + elfPath;
             if (doObjDump(startInfo, ".dbg") == false)
                 return false;
             if (ParseDebugInfo(ShortFilename + ".dbg") == false)
@@ -180,6 +180,11 @@ namespace ArdDebug
             //// line number table
             //startInfo.Arguments = "-W " + elfPath;
             //if (doObjDump(startInfo, ".lin") == false)
+            //    return false;
+
+            //startInfo.FileName = "avr-nm.exe";
+            //startInfo.Arguments = "-A -C -n -S  " + elfPath;
+            //if (doObjDump(startInfo, ".sym") == false)
             //    return false;
 
             return true;

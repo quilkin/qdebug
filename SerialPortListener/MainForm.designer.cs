@@ -266,7 +266,7 @@
             this.columnLineNum,
             this.columnLine,
             this.columnAddr});
-            this.sourceView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.sourceView.Font = new System.Drawing.Font("Lucida Sans Typewriter", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
             this.sourceView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.sourceView.Location = new System.Drawing.Point(12, 64);
@@ -311,7 +311,7 @@
             this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
             this.columnText});
-            this.disassemblyView.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.disassemblyView.Font = new System.Drawing.Font("Lucida Sans Typewriter", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.disassemblyView.FullRowSelect = true;
             this.disassemblyView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.disassemblyView.HideSelection = false;

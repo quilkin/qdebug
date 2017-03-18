@@ -23,6 +23,7 @@ namespace ArdDebug
             this.btnStepOver = form.StepOver;
             GUI = form;
             GUI.RunButtons(false);
+            
 
         }
         private MainForm GUI;
@@ -95,7 +96,8 @@ namespace ArdDebug
         //}
         public void Startup(Serial.SerialPortManager _spmanager)
         {
-            Leds(true);
+            
+       //     Leds(true);
             //btnPause.Enabled = false;
             GUI.RunButtons(false);
             this.spmanager = _spmanager;
@@ -109,34 +111,35 @@ namespace ArdDebug
             if (comString.Length < 2)
             {
                 MessageBox.Show("Cannot find device, please check connection");
-                Leds(false);
+                GUI.RunButtons(true);
                 return;
             }
             GetVariables();
             SingleStep();
-            Leds(false);
+    //        Leds(false);
             GUI.RunButtons(true);
+            varView.Enabled = true;
         }
 
-        private void Leds(bool running)
-        {
-            if (running)
-            {
-                runLED.BackColor = System.Drawing.Color.LimeGreen;
-                stopLED.BackColor = System.Drawing.Color.DarkRed;
-            }
-            else
-            {
-                runLED.BackColor = System.Drawing.Color.DarkGreen;
-                stopLED.BackColor = System.Drawing.Color.Red;
-            }
-        }
+        //private void Leds(bool running)
+        //{
+        //    if (running)
+        //    {
+        //        runLED.BackColor = System.Drawing.Color.LimeGreen;
+        //        stopLED.BackColor = System.Drawing.Color.DarkRed;
+        //    }
+        //    else
+        //    {
+        //        runLED.BackColor = System.Drawing.Color.DarkGreen;
+        //        stopLED.BackColor = System.Drawing.Color.Red;
+        //    }
+        //}
         public void SingleStep()
         {
             String stepStr = "P0000\n";
             //bool continuing = true;
             Send(stepStr);
-            Leds(true);
+            //Leds(true);
             GUI.RunButtons(false);
             // make this a backgroud task so that we can abort, if required, with the 'pause' button
             _Running = new BackgroundWorker();
@@ -174,7 +177,7 @@ namespace ArdDebug
                     }
                 }
                 while (true);
-                Leds(false);
+                //Leds(false);
                 GUI.RunButtons(true);
             });
             _Running.RunWorkerAsync();
@@ -186,7 +189,7 @@ namespace ArdDebug
         /// </summary>
         public void StepOver()
         {
-            Leds(true);
+            //Leds(true);
             GUI.RunButtons(false);
             if (nextBreakpoint != null)
             {
@@ -199,7 +202,7 @@ namespace ArdDebug
             {
                 MessageBox.Show("Error, no suitable step found");
             }
-            Leds(false);
+            //Leds(false);
             GUI.RunButtons(true);
         }
 
@@ -231,7 +234,7 @@ namespace ArdDebug
             _Running = new BackgroundWorker();
             _Running.WorkerSupportsCancellation = true;
             bool pauseReqd = false;
-            Leds(true);
+            //Leds(true);
             GUI.RunButtons(false);
             _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
@@ -266,7 +269,7 @@ namespace ArdDebug
                 UpdateCodeWindows(bp.ProgramCounter);
                 if (!pauseReqd)
                     MarkBreakpointHit(bp);
-                Leds(false);
+                //Leds(false);
                 GUI.RunButtons(true);
             });
             _Running.RunWorkerAsync();
@@ -276,7 +279,7 @@ namespace ArdDebug
 
         public void GetVariables()
         {
-            Leds(true);
+            //Leds(true);
             GUI.RunButtons(false);
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
@@ -287,10 +290,12 @@ namespace ArdDebug
                 var.GetValue();
             }
             UpdateVariableWindow();
-            Leds(false);
+            //Leds(false);
             GUI.RunButtons(true);
         }
 
+        private int expandedTags = 0;
+        private List<Object> viewTags = new List<Object>();
         public void Variable_Click(object sender, EventArgs e)
         {
             if (varView.SelectedItems.Count == 0)
@@ -303,35 +308,75 @@ namespace ArdDebug
                 return;
             if (var.Type.BaseType == null)
                 return;
-            //varView.Sorting = SortOrder.None;
-            if ((string)clicked.Tag != "expanded")
+
+            if (clicked.Tag==null)
             {
                 // expand item to show contents of this compound variable
                 int size = var.Type.Size;
                 int index = clicked.Index;
                 ushort addr = var.Address;
-                // get the individual array elements from memory
-                for (int i = 0; i < size; i++)
+                ++expandedTags;
+
+                if (var.Type.Name == "pointer")
                 {
-                    
-                    Variable arrayElement = new Variable(this);
-                    arrayElement.Address = addr;
-                    arrayElement.Type = var.Type.BaseType;
-                    arrayElement.Name = itemName + '[' + i + ']';
-                    // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
-                    Variables.Add(arrayElement);
-                    //GetVariable(arrayElement);
-                    arrayElement.GetValue();
-                    string[] items = { "  " + arrayElement.Name, var.Type.BaseType.Name, addr.ToString("X4"), arrayElement.currentValue };
+                    // get the value pointed to
+                    Variable pointerElement = new Variable(this);
+                    Variable indirect = new Variable(this);
+
+                    pointerElement.Address = addr;
+                    pointerElement.Type = var.Type.BaseType;
+                    pointerElement.Name = "* " + itemName ;
+                    pointerElement.GetValue();
+                    // now get the indirected value
+                    int indAddr = -1;
+                    int.TryParse(pointerElement.currentValue, out indAddr);
+                    if (indAddr >= 0)
+                    {
+                        indirect.Address = (ushort)indAddr;
+                        indirect.Type = var.Type.BaseType;
+                        indirect.Name = var.Type.Name;
+                        // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
+                        Variables.Add(indirect);
+                        indirect.GetValue();
+
+                    }
+                    string[] items = { "  " + pointerElement.Name, var.Type.BaseType.Name, "0x"+indAddr.ToString("X4"), indirect.currentValue };
                     ListViewItem arrayItem = new ListViewItem(items);
-                    arrayItem.Name = arrayElement.Name;
+                    arrayItem.Name = pointerElement.Name;
                     arrayItem.BackColor = System.Drawing.Color.Azure;
-                    arrayItem.Tag = "arrayItem";
-                    varView.Items.Insert(++index,arrayItem);
-                    addr += (ushort)var.Type.BaseType.Size;
+                    arrayItem.Tag = clicked.Tag = expandedTags;
+                    viewTags.Add(clicked.Tag);
+                    varView.Items.Insert(++index, arrayItem);
+                    //clicked.Tag = "expandedPointer";
+                }
+                else
+                {
+                    // get the individual array elements from memory
+                    for (int i = 0; i < size; i++)
+                    {
+                        Variable arrayElement = new Variable(this);
+                        
+                        arrayElement.Address = addr;
+                        arrayElement.Type = var.Type.BaseType;
+                        arrayElement.Name = itemName + '[' + i + ']';
+                        // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
+                        Variables.Add(arrayElement);
+                        //GetVariable(arrayElement);
+                        arrayElement.GetValue();
+
+                        string[] items = { "  " + arrayElement.Name, var.Type.BaseType.Name, addr.ToString("X4"), arrayElement.currentValue };
+                        ListViewItem arrayItem = new ListViewItem(items);
+                        arrayItem.Name = arrayElement.Name;
+                        arrayItem.BackColor = System.Drawing.Color.Azure;
+                        arrayItem.Tag = clicked.Tag = expandedTags;
+                        viewTags.Add(clicked.Tag);
+                        varView.Items.Insert(++index, arrayItem);
+                        addr += (ushort)var.Type.BaseType.Size;
+                    }
+                    //clicked.Tag = "expandedArray";
                 }
                 UpdateVariableWindow();
-                clicked.Tag = "expanded";
+                //clicked.Tag = "expanded";
             }
             else
             {
@@ -339,19 +384,17 @@ namespace ArdDebug
                 ListView.ListViewItemCollection items = varView.Items;
                 foreach (ListViewItem item  in items)
                 {
-                    if ((string) item.Tag == "arrayItem")
+                    if (item.Tag == clicked.Tag)
                     {
                         string varName = item.Name;
                         Variable arrayVar = Variables.Find(x => x.Name == varName);
                         Variables.Remove(arrayVar);
                         varView.Items.Remove(item);
-
                     }
                 }
-                clicked.Tag = "";
-            //    varView.Sorting = SortOrder.Ascending;
-
-            }
+                viewTags.Remove(clicked.Tag);
+                clicked.Tag = null;
+             }
 
         }
 
@@ -391,9 +434,27 @@ namespace ArdDebug
                     ListViewItem lvi = lvis[0];
                                    
                     lvi.SubItems[2].Text = "0x" + var.Address.ToString("X4");
-                    lvi.SubItems[3].Text = (var.Type.BaseType == null) ? var.currentValue : "....";
+                    if (var.Type.BaseType == null)
+                    {
+                        lvi.SubItems[3].Text = var.currentValue;
+                    }
+                    else if (var.Type.Name == "array")
+                    {
+                        lvi.SubItems[3].Text = "....";
+                    }
+                    else if (var.Type.Name == "pointer")
+                    {
+                        // show addreess pointed to (in hex)
+                        int addr=-1;
+                        int.TryParse(var.currentValue, out addr);
+                        if (addr >= 0)
+                        {
+                            lvi.SubItems[3].Text = "0x" + addr.ToString("X4");
+                        }
+            
+                    }
 
-                                     
+
                 }
             }
         }

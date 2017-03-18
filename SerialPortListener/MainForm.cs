@@ -57,6 +57,17 @@ namespace ArdDebug
             }
             else
             {
+                if (enabled)
+                {
+                    panelRunning.BackColor = Color.DarkGreen;
+                    panelStopped.BackColor = Color.Red;
+
+                }
+                else
+                {
+                    panelRunning.BackColor = Color.LimeGreen;
+                    panelStopped.BackColor = Color.DarkRed;
+                }
                 buttonStep.Enabled = enabled;
                 buttonStepOver.Enabled = enabled;
                 buttonRun.Enabled = enabled;

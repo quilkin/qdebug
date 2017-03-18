@@ -87,7 +87,8 @@ namespace ArdDebug
 
             if (comString.Length < 5)
                 return ;
-
+            if (Type == null)
+                return;
             if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
             {
                 if (Type.Size == 1)
