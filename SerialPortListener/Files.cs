@@ -40,6 +40,38 @@ namespace ArdDebug
             MessageBox.Show("Problem opening files");
             return false;
         }
+
+        private bool OpenSourceFile()
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
+            ofd.Title = "Load Arduino Sketch";
+            var dialogResult = ofd.ShowDialog();
+            if (dialogResult == DialogResult.OK)
+            {
+                ShortFilename = ofd.SafeFileName;
+                FullFilename = ofd.FileName;
+                //// check that it's a supported processor
+                //int lastslash = FullFilename.LastIndexOf("\\");
+                //string infofile = FullFilename.Substring(0, lastslash) + "\\Debug\\" + "board.buildinfo";
+                //foreach (var line in System.IO.File.ReadLines(infofile))
+                //{
+                //    if (line.Contains("build.mcu"))
+                //    {
+                //        if (line.Contains("atmega328")) // uno, mini, nano
+                //            return true;
+                //        else
+                //        {
+                //            MessageBox.Show("QDebug does ot support your device. Please check for Arduino Uno, Mini or Nano");
+                //            return false;
+                //        }
+                //    }
+                //}
+                //MessageBox.Show("Cannot find target baord info. Please check taht you are using Arduino Uno, Mini or Nano");
+                return true;
+            }
+            return false;
+        }
         public bool ReOpenFile()
         {
             if (source == null)

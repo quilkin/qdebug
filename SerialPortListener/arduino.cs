@@ -14,13 +14,13 @@ namespace ArdDebug
     {
         public Arduino(MainForm form)
         {
-            this.stopLED = form.LedStopped;
-            this.runLED = form.LedStopped;
-            this.btnPause = form.Pause;
-            this.btnRun = form.Run;
-            this.btnStart = form.Start;
-            this.btnStep= form.Step;
-            this.btnStepOver = form.StepOver;
+            //this.stopLED = form.LedStopped;
+            //this.runLED = form.LedStopped;
+            //this.btnPause = form.Pause;
+            //this.btnRun = form.Run;
+            //this.btnStart = form.Start;
+            //this.btnStep= form.Step;
+            //this.btnStepOver = form.StepOver;
             GUI = form;
             GUI.RunButtons(false);
             
@@ -35,11 +35,15 @@ namespace ArdDebug
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
         private List<Variable> Variables = new List<Variable>();
         private List<VariableType> VariableTypes = new List<VariableType>();
+        private List<Function> Functions = new List<Function>();
+
         /// <summary>
         /// variable names found by parsing the assembler file, included in our own source files
         /// Just used for comaprison when parsing full list of variables which contain eveything
         /// </summary>
-        private List<String> MyVariables = new List<String>();
+        //private List<String> MyVariables = new List<String>();
+
+       // private List<String> MyFunctions = new List<String>();
 
         /// <summary>
         /// where program counter is currently sitting
@@ -52,6 +56,11 @@ namespace ArdDebug
         private Panel stopLED, runLED;
         private String comString = String.Empty;
         private Button btnStart, btnStep, btnStepOver, btnRun, btnPause;
+
+        /// <summary>
+        /// source file reference from .elf file
+        /// </summary>
+        private int sourceFileRef;
 
         Serial.SerialPortManager spmanager;
 
@@ -84,21 +93,15 @@ namespace ArdDebug
             "uint64_t"
         };
 
-        System.Drawing.Color sourceLineColour = System.Drawing.Color.AliceBlue;
+        System.Drawing.Color sourceLineColour = System.Drawing.SystemColors.GradientInactiveCaption;
         System.Drawing.Color breakpointColour = System.Drawing.Color.Red;
         System.Drawing.Color breakpointHitColour = System.Drawing.Color.Orange;
 
-        //private void RunButtons(bool enabled)
-        //{
-        //    btnStep.Enabled =  enabled;
-        //    btnStepOver.Enabled = enabled;
-        //    btnRun.Enabled = enabled;
-        //}
+
         public void Startup(Serial.SerialPortManager _spmanager)
         {
             
-       //     Leds(true);
-            //btnPause.Enabled = false;
+
             GUI.RunButtons(false);
             this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
@@ -116,71 +119,92 @@ namespace ArdDebug
             }
             GetVariables();
             SingleStep();
-    //        Leds(false);
             GUI.RunButtons(true);
             varView.Enabled = true;
         }
 
-        //private void Leds(bool running)
-        //{
-        //    if (running)
-        //    {
-        //        runLED.BackColor = System.Drawing.Color.LimeGreen;
-        //        stopLED.BackColor = System.Drawing.Color.DarkRed;
-        //    }
-        //    else
-        //    {
-        //        runLED.BackColor = System.Drawing.Color.DarkGreen;
-        //        stopLED.BackColor = System.Drawing.Color.Red;
-        //    }
-        //}
+        //delegate void varViewDelegate();
         public void SingleStep()
         {
-            String stepStr = "P0000\n";
-            //bool continuing = true;
-            Send(stepStr);
-            //Leds(true);
-            GUI.RunButtons(false);
-            // make this a backgroud task so that we can abort, if required, with the 'pause' button
-            _Running = new BackgroundWorker();
-            _Running.WorkerSupportsCancellation = true;
-            _Running.DoWork += new DoWorkEventHandler((state, args) =>
+            if (source.InvokeRequired)
             {
-                do
+                varViewDelegate d = new varViewDelegate(SingleStep);
+                varView.Invoke(d, new object[] { });
+            }
+            else
+            {
+                if (currentBreakpoint != null)
                 {
-                    comString = ReadLine();
-                    if (comString.Length == 0)
+                    // see if this line calls a library function (especially delay())
+                    // if so, step over rather than into it.
+                    int line = currentBreakpoint.SourceLine;
+                    ListViewItem sourceItem = source.Items[line-1];
+                    string sourceLine = sourceItem.SubItems[2].Text;
+                    bool isAnyFunction = false;
+                    bool isMyFunction = false;
+                    foreach (Function func in Functions)
                     {
-                        MessageBox.Show("timeout in single step");
-                        break;
+                        if (sourceLine.Contains(func.Name))
+                        {
+                            isAnyFunction = true;
+                            if (func.fileRef == sourceFileRef)
+                                isMyFunction = true;
+                            break;
+                        }
                     }
-                    if (_Running.CancellationPending)
+                    if (isAnyFunction==true && isMyFunction==false)
                     {
+                        StepOver();
+                        return;
+                    }
+                  }
+
+                String stepStr = "P0000\n";
+                //bool continuing = true;
+                Send(stepStr);
+                //Leds(true);
+                GUI.RunButtons(false);
+                // make this a backgroud task so that we can abort, if required, with the 'pause' button
+                _Running = new BackgroundWorker();
+                _Running.WorkerSupportsCancellation = true;
+                _Running.DoWork += new DoWorkEventHandler((state, args) =>
+                {
+                    do
+                    {
+                        comString = ReadLine();
+                        if (comString.Length == 0)
+                        {
+                            MessageBox.Show("timeout in single step");
+                            break;
+                        }
+                        if (_Running.CancellationPending)
+                        {
                         // force device to think it's reached its target
                         Send("Y");
-                        break;
-                    }
-                    char firstChar = comString[0];
-                    if (firstChar == 'P')
-                    {
+                            break;
+                        }
+                        char firstChar = comString[0];
+                        if (firstChar == 'P')
+                        {
                         // moved to where we need; this is our 'step'
                         //continuing = false;
                         newProgramCounter();
-                        GetVariables();
-                        break;
-                    }
-                    else if (firstChar == 'S')
-                    {
-                        string reply = newProgramCounter();
-                        Send(reply);
+                            GetVariables();
+                            break;
+                        }
+                        else if (firstChar == 'S')
+                        {
+                            string reply = newProgramCounter();
+                            Send(reply);
 
+                        }
                     }
-                }
-                while (true);
+                    while (true);
                 //Leds(false);
                 GUI.RunButtons(true);
-            });
-            _Running.RunWorkerAsync();
+                });
+                _Running.RunWorkerAsync();
+            }
 
         }
 
@@ -196,6 +220,7 @@ namespace ArdDebug
                 //// set up a 'temporary' breakpoint
                 //Breakpoint bp = new Breakpoint("", 0);
                 //bp.ProgramCounter = nextBreakpoint;
+                currentBreakpoint = nextBreakpoint;
                 GoToBreakpoint(nextBreakpoint);
             }
             else
@@ -234,7 +259,7 @@ namespace ArdDebug
             _Running = new BackgroundWorker();
             _Running.WorkerSupportsCancellation = true;
             bool pauseReqd = false;
-            //Leds(true);
+
             GUI.RunButtons(false);
             _Running.DoWork += new DoWorkEventHandler((state, args) =>
             {
@@ -267,9 +292,9 @@ namespace ArdDebug
                     SingleStep();  // not sure why this is needed; variables don't update otherwise
                 UpdateVariableWindow();
                 UpdateCodeWindows(bp.ProgramCounter);
-                if (!pauseReqd)
+                if (!pauseReqd && bp.Manual)
                     MarkBreakpointHit(bp);
-                //Leds(false);
+
                 GUI.RunButtons(true);
             });
             _Running.RunWorkerAsync();
@@ -294,8 +319,8 @@ namespace ArdDebug
             GUI.RunButtons(true);
         }
 
-        private int expandedTags = 0;
-        private List<Object> viewTags = new List<Object>();
+        //private int expandedTags = 0;
+        private List<ListViewItem> expandedItems = new List<ListViewItem>();
         public void Variable_Click(object sender, EventArgs e)
         {
             if (varView.SelectedItems.Count == 0)
@@ -309,13 +334,14 @@ namespace ArdDebug
             if (var.Type.BaseType == null)
                 return;
 
-            if (clicked.Tag==null)
+            if (expandedItems.Contains(clicked)==false)
             {
                 // expand item to show contents of this compound variable
                 int size = var.Type.Size;
                 int index = clicked.Index;
                 ushort addr = var.Address;
-                ++expandedTags;
+                //clicked.Tag = ++expandedTags;
+                expandedItems.Add(clicked);
 
                 if (var.Type.Name == "pointer")
                 {
@@ -326,6 +352,7 @@ namespace ArdDebug
                     pointerElement.Address = addr;
                     pointerElement.Type = var.Type.BaseType;
                     pointerElement.Name = "* " + itemName ;
+                    Variables.Add(pointerElement);
                     pointerElement.GetValue();
                     // now get the indirected value
                     int indAddr = -1;
@@ -334,7 +361,7 @@ namespace ArdDebug
                     {
                         indirect.Address = (ushort)indAddr;
                         indirect.Type = var.Type.BaseType;
-                        indirect.Name = var.Type.Name;
+                        indirect.Name = "*"+var.Type.Name;
                         // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
                         Variables.Add(indirect);
                         indirect.GetValue();
@@ -344,8 +371,8 @@ namespace ArdDebug
                     ListViewItem arrayItem = new ListViewItem(items);
                     arrayItem.Name = pointerElement.Name;
                     arrayItem.BackColor = System.Drawing.Color.Azure;
-                    arrayItem.Tag = clicked.Tag = expandedTags;
-                    viewTags.Add(clicked.Tag);
+                    arrayItem.Tag = clicked.Index;
+                    //viewTags.Add(clicked.Tag);
                     varView.Items.Insert(++index, arrayItem);
                     //clicked.Tag = "expandedPointer";
                 }
@@ -368,8 +395,8 @@ namespace ArdDebug
                         ListViewItem arrayItem = new ListViewItem(items);
                         arrayItem.Name = arrayElement.Name;
                         arrayItem.BackColor = System.Drawing.Color.Azure;
-                        arrayItem.Tag = clicked.Tag = expandedTags;
-                        viewTags.Add(clicked.Tag);
+                        arrayItem.Tag = clicked.Index;
+                        //viewTags.Add(clicked.Tag);
                         varView.Items.Insert(++index, arrayItem);
                         addr += (ushort)var.Type.BaseType.Size;
                     }
@@ -381,19 +408,30 @@ namespace ArdDebug
             else
             {
                 // unexpand the added items, and remove the extra temporary variables
-                ListView.ListViewItemCollection items = varView.Items;
-                foreach (ListViewItem item  in items)
+                foreach (ListViewItem expandedItem in expandedItems)
                 {
-                    if (item.Tag == clicked.Tag)
+                    if (expandedItem == clicked)
+                        break;
+                }
+ 
+                foreach (ListViewItem item in varView.Items)
+                {
+                    if (item.Tag != null)
                     {
-                        string varName = item.Name;
-                        Variable arrayVar = Variables.Find(x => x.Name == varName);
-                        Variables.Remove(arrayVar);
-                        varView.Items.Remove(item);
+                        if ((int)item.Tag == clicked.Index)
+                        {
+                            string varName = item.Name;
+                            Variable arrayVar = Variables.Find(x => x.Name == varName);
+                            Variables.Remove(arrayVar);
+                            varView.Items.Remove(item);
+                        }
                     }
                 }
-                viewTags.Remove(clicked.Tag);
+                expandedItems.Remove(clicked);
+                //viewTags.Remove(clicked.Tag);
                 clicked.Tag = null;
+
+
              }
 
         }
@@ -466,7 +504,7 @@ namespace ArdDebug
 
         delegate void updateDissDelegate(ushort pc);
         void UpdateDisassembly(ushort pc)
-        {
+         {
             if (disassembly.InvokeRequired)
             {
                 updateDissDelegate d = new updateDissDelegate(UpdateDisassembly);
@@ -476,7 +514,7 @@ namespace ArdDebug
             {
                 int linecount = 0;
                 nextBreakpoint = null;
-                if (disassembly != null && disassembly.Visible)
+                if (disassembly != null )
                 {
                     // find a line that starts with [whitespace][pc][:]
                     ListView.ListViewItemCollection disItems = disassembly.Items;
@@ -671,7 +709,7 @@ namespace ArdDebug
                     // single-stepping
                     if (AreWeThereYet(pc))
                     {
-                        UpdateCodeWindows(pc);
+                       // UpdateCodeWindows(pc);
                         //return Chars.YES_CHAR.ToString();
                         return "Y";
                     }

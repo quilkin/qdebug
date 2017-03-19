@@ -7,20 +7,7 @@ namespace ArdDebug
 {
     partial class Arduino
     {
-        private bool OpenSourceFile()
-        {
-            OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Filter = "Arduino files|*.ino;*.c;*.cpp|All files (*.*)|*.*";
-            ofd.Title = "Load Arduino Sketch";
-            var dialogResult = ofd.ShowDialog();
-            if (dialogResult == DialogResult.OK)
-            {
-                ShortFilename = ofd.SafeFileName;
-                FullFilename = ofd.FileName;
-                return true;
-            }
-            return false;
-        }
+
 
         private bool parseSourceFile()
         {
@@ -30,10 +17,11 @@ namespace ArdDebug
             disassembly.Items.Clear();
             varView.Items.Clear();
             Variables.Clear();
-            MyVariables.Clear();
+           // MyVariables.Clear();
+            Functions.Clear();
             int count = 1;
             int SerialLine = 0;
-            bool qdebugHeaderFound = false;
+           // bool qdebugHeaderFound = false;
             bool qdebugConstrFound = false;
             foreach (var line in System.IO.File.ReadLines(FullFilename))
             {
@@ -179,7 +167,9 @@ namespace ArdDebug
         {
             Variable var = null;
             VariableType varType = null;
-            int sourceFileAbbr = 0;
+            Function func = null;
+
+            sourceFileRef = 0;
 
             // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
 
@@ -196,17 +186,17 @@ namespace ArdDebug
             {
                 if (line.Contains(ShortFilename))
                 {
-                    if (line.Contains(ShortFilename + ".elf") == false) // i.e. not the heaber line
+                    if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
                     {
                         // 8 3   0   0   qdebugtest.ino
                         char[] delimiters = new char[] { ' ', '\t' };
                         string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                        int.TryParse(parts[0], out sourceFileAbbr);
+                        int.TryParse(parts[0], out sourceFileRef);
                         break;
                     }
                 }
             }
-            if (sourceFileAbbr == 0)
+            if (sourceFileRef== 0)
             {
                 MessageBox.Show("error parsing debug file, no source file abbr found");
                 return false;
@@ -390,15 +380,14 @@ namespace ArdDebug
 
             }
 
-
-
-
-            // find Array types next
+            // find Array types, structs and pointers next
             insideDef = false;
 
+            bool pointerVar = false;
+            bool structVar = false;
             foreach (string line in File.ReadLines(file))
             {
-                bool pointerVar = false;
+
                 if (line.Contains(".debug_line"))
                 {
                     // end of the bit we are interested in
@@ -463,7 +452,7 @@ namespace ArdDebug
                     varType = null;
                     insideDef = false;
                 }
-                if ((line.Contains("DW_TAG_array_type") || line.Contains("DW_TAG_pointer_type")) && insideDef == false)
+                if ((line.Contains("DW_TAG_array_type") || line.Contains("DW_TAG_pointer_type") || line.Contains("DW_TAG_structure_type")) && insideDef == false)
                 {
                     // < 1 >< 1f62 >: Abbrev Number: 29(DW_TAG_array_type)
                     //< 1f63 > DW_AT_type        : < 0x6c7 >        .... points to base type
@@ -473,6 +462,7 @@ namespace ArdDebug
                     //  < 203c > DW_AT_upper_bound : 9
 
                     pointerVar = line.Contains("DW_TAG_pointer_type");
+                    structVar = line.Contains("DW_TAG_structure_type");
                     int index1 = line.LastIndexOf('<');
                     int index2 = line.LastIndexOf('>');
                     UInt16 reference = 0;
@@ -480,8 +470,13 @@ namespace ArdDebug
                     if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
                     {
                         varType = new VariableType(reference);
-                        varType.Name = pointerVar? "pointer" : "array";
+                        varType.Name = "array";
+                        if (pointerVar)
+                            varType.Name = "pointer";
+                        if (structVar)
+                            varType.Name = "struct";
                     }
+
                     else
                     {
                         MessageBox.Show("error parsing variable types.." + line);
@@ -490,11 +485,13 @@ namespace ArdDebug
 
             }
 
-            // now find the variables themselves. Remove old ones first
+            // now find the variables themselves. Remove old ones first. Also find our own functions, so we can skip over library functions
             varView.Items.Clear();
             varView.Sorting = SortOrder.None;
+            
             foreach (string line in File.ReadLines(file))
             {
+                
                 if (line.Contains(".debug_line"))
                 {
                     // end of the bit we are interested in
@@ -507,7 +504,7 @@ namespace ArdDebug
                 //  < 1fad > DW_AT_decl_line   : 9
                 //  < 1fae > DW_AT_type        : < 0x1fb8 >
                 //  < 1fb2 > DW_AT_location    : 5 byte block: 3 0 1 80 0(DW_OP_addr: 800100)
-                if (var != null)
+                if (var != null || func != null)
                 {
                     // found something in the previous line
                     if (line.Contains("DW_AT_name"))
@@ -516,16 +513,17 @@ namespace ArdDebug
                         //  or          "< 1fa8 > DW_AT_name        : num2"
                         int index = line.LastIndexOf(':');
                         String name = line.Substring(index + 1).Trim();
+                        if (func != null)
+                        {
+                            func.Name = name;
+                        }
                         // We're only interested in vars that occur in our own files, not library files
                         // Also, only global vars for now.
                         //if (MyVariables.Contains(name))
+                        else
                         {
                             var.Name = name;
                         }
-                        //else
-                        //{
-                        //    var = null;  // ignore and get ready for next one
-                        //}
 
                     }
                     else if (line.Contains("DW_AT_type"))
@@ -536,7 +534,11 @@ namespace ArdDebug
                         string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
                         if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out typeRef))
                         {
-                            var.Type = VariableTypes.Find(x => x.Reference == typeRef);
+                            VariableType vType  = VariableTypes.Find(x => x.Reference == typeRef);
+                            if (var != null)
+                                var.Type = vType;
+                            else if (func != null)
+                                func.Type = vType;
                         }
                         else
                         {
@@ -548,15 +550,22 @@ namespace ArdDebug
                         int index = line.LastIndexOf(':');
                         UInt16 fileRef = 0;
                         string refStr = line.Substring(index + 1);
-                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out fileRef))
+                        if (ushort.TryParse(refStr,  out fileRef))
                         {
-                            if (fileRef == sourceFileAbbr)
+                            if (var != null)
                             {
-                                // this variable is part of our source file
+                                if (fileRef == sourceFileRef)
+                                {
+                                    // this variable is part of our source file
+                                }
+                                else
+                                {
+                                    var = null;  // ignore and get ready for next one
+                                }
                             }
-                            else
+                            else if (func != null)
                             {
-                                var = null;  // ignore and get ready for next one
+                                func.fileRef = fileRef;
                             }
 
                         }
@@ -565,7 +574,7 @@ namespace ArdDebug
                             MessageBox.Show("error parsing variables..." + line);
                         }
                     }
-                    else if (line.Contains("DW_AT_location"))
+                    else if (line.Contains("DW_AT_location") && var != null)
                     {
                         if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
                         {
@@ -618,10 +627,24 @@ namespace ArdDebug
                             MessageBox.Show("error parsing variables..." + line);
                         }
                     }
+                    else if (line.Contains("DW_AT_sibling") && func != null)
+                    {
+                        // done with this func
+                        if (func.Name != null && func.Name.Length > 0)
+                        {
+                            Functions.Add(func);
+                        }
+                        func = null;
+                    }
                 }
-                if (line.Contains("DW_TAG_variable"))
+                if (line.Contains("DW_TAG_variable") )
                 {
                     var = new Variable(this);
+   
+                }
+                else if (line.Contains("DW_TAG_subprogram"))
+                {
+                    func = new Function();
                 }
             }
 
@@ -700,7 +723,7 @@ namespace ArdDebug
                                     ListViewItem sourceItem = sourceItems[bp.SourceLine - 1];
                                     if (sourceItem != null)
                                     {
-                                        sourceItem.BackColor = System.Drawing.Color.AliceBlue;
+                                        sourceItem.BackColor = System.Drawing.SystemColors.GradientInactiveCaption;
                                     }
                                 }
                             }

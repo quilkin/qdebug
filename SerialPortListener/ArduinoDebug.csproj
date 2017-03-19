@@ -51,6 +51,7 @@
     <Compile Include="breakpoint.cs" />
     <Compile Include="Comms.cs" />
     <Compile Include="Files.cs" />
+    <Compile Include="function.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -89,6 +90,7 @@
     <None Include="target\qdebugtest.ino" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="licence.txt" />
     <Content Include="target\commonc.cpp" />
     <Content Include="target\commonc.h" />
     <Content Include="target\mySerial.cpp" />

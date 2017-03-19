@@ -1,16 +1,21 @@
-﻿//typedef
-//volatile
+﻿
 three breakpoints
-//array
-//step over
-//check that there is a connection
-//goto:
-//public: (etc)
+
 higher baudrate?
-//add pause to single-step
-//enable & disable buttons
+faster parse of hex numbers in c# ?
+
 recover after pause in delay()
+
 check that new sketch has uploaded
-faster parse of hex numbers in c#
-//pointers!
-expand & contact vars correctly
+//check board type
+
+expand & contract vars correctly
+ensure latest version loaded
+//'step over' stepping to same line
+//'step over' all library functions
+pointer to array returns zero addr
+//change to portrait shape window
+check for use of portd7
+//remove line numbers from source view
+//[library object] has no type
+//single step end of function?

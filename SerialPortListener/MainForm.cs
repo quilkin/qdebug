@@ -24,14 +24,14 @@ namespace ArdDebug
             UserInitialization();
         }
 
-        // controls need by Arduino logic
-        public Panel LedRunning { get { return panelRunning; } }
-        public Panel LedStopped { get { return panelStopped; } }
-        public Button Start     {  get { return btnStart; } }
-        public Button Step      { get { return buttonStep; } }
-        public Button StepOver  { get { return buttonStepOver; } }
-        public Button Run       { get { return buttonRun; } }
-        public Button Pause     { get { return buttonPause; } }
+        //// controls need by Arduino logic
+        //public Panel LedRunning { get { return panelRunning; } }
+        //public Panel LedStopped { get { return panelStopped; } }
+        //public Button Start     {  get { return btnStart; } }
+        //public Button Step      { get { return buttonStep; } }
+        //public Button StepOver  { get { return buttonStepOver; } }
+        //public Button Run       { get { return buttonRun; } }
+        //public Button Pause     { get { return buttonPause; } }
 
         private void UserInitialization()
         {
@@ -45,6 +45,8 @@ namespace ArdDebug
             baudRateComboBox.DataSource = mySerialSettings.BaudRateCollection;
 
             this.FormClosing += new FormClosingEventHandler(MainForm_FormClosing);
+            this.timer1.Enabled = false;
+            this.timer1.Interval = 500;
         }
 
         delegate void buttonDelegate(bool enabled);
@@ -61,12 +63,15 @@ namespace ArdDebug
                 {
                     panelRunning.BackColor = Color.DarkGreen;
                     panelStopped.BackColor = Color.Red;
+                    timer1.Stop();
 
                 }
                 else
                 {
                     panelRunning.BackColor = Color.LimeGreen;
                     panelStopped.BackColor = Color.DarkRed;
+                    timer1.Enabled = true;
+                    timer1.Start();
                 }
                 buttonStep.Enabled = enabled;
                 buttonStepOver.Enabled = enabled;
@@ -115,7 +120,7 @@ namespace ArdDebug
 
         private void buttonLoad_Click(object sender, EventArgs e)
         {
-            if (Arduino.OpenFiles(this.sourceView,this.disassemblyView,this.varView,this.tbData))
+            if (Arduino.OpenFiles(this.sourceView,this.disassemblyView,this.varView,this.commsData))
             {
                 this.labelSketch.Text = Arduino.FullFilename;
             }        
@@ -146,7 +151,16 @@ namespace ArdDebug
 
         private void buttonComms_Click(object sender, EventArgs e)
         {
-            tbData.Visible = !tbData.Visible;
+            commsData.Visible = !commsData.Visible;
+            if (commsData.Visible)
+            {
+                varView.Height = 350;
+            }
+            else
+            {
+                varView.Height = 500;
+            }
+            varView.Refresh();
         }
 
         private void buttonDiss_Click(object sender, EventArgs e)
@@ -154,16 +168,26 @@ namespace ArdDebug
             disassemblyView.Visible = !disassemblyView.Visible;
             if (disassemblyView.Visible)
             {
-                varView.Height = 270;
+                sourceView.Height = 420;
             }
             else
             {
-                varView.Height = 470;
+                sourceView.Height = 620;
             }
-            varView.Refresh();
+            sourceView.Refresh();
            
         }
 
-
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (panelRunning.BackColor == Color.LimeGreen)
+            {
+                panelRunning.BackColor = Color.DarkGreen;
+            }
+            else
+            {
+                panelRunning.BackColor = Color.LimeGreen;
+            }
+        }
     }
 }

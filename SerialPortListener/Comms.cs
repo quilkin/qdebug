@@ -12,21 +12,30 @@ namespace ArdDebug
 {
     partial class Arduino
     {
+        delegate void commsDelegate(string str, bool sending);
         private void UpdateCommsBox(string str, bool sending)
         {
-            if (comms.Visible == false)
-                return;
-            if (str == null)
-                return;
-            if (_Running != null && _Running.IsBusy)
-                return;
-            int maxTextLength = 1000; // maximum text length in text box
-            if (comms.TextLength > maxTextLength)
-                comms.Text = comms.Text.Remove(0, maxTextLength / 2);
+            if (comms.InvokeRequired)
+            {
+                commsDelegate d = new commsDelegate(UpdateCommsBox);
+                comms.Invoke(d, new object[] {  str, sending });
+            }
+            else
+            {
+                if (comms.Visible == false)
+                    return;
+                if (str == null)
+                    return;
+                //if (_Running != null && _Running.IsBusy)
+                //    return;
+                int maxTextLength = 1000; // maximum text length in text box
+                if (comms.TextLength > maxTextLength)
+                    comms.Text = comms.Text.Remove(0, maxTextLength / 2);
 
-            comms.ForeColor = (sending ? System.Drawing.Color.Red : System.Drawing.Color.Black);
+                comms.ForeColor = (sending ? System.Drawing.Color.Red : System.Drawing.Color.Black);
 
-            comms.AppendText(str + " ");
+                comms.AppendText(str + " ");
+            }
         }
 
         public string ReadLine(int timeout)
