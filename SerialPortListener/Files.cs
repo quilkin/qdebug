@@ -51,23 +51,7 @@ namespace ArdDebug
             {
                 ShortFilename = ofd.SafeFileName;
                 FullFilename = ofd.FileName;
-                //// check that it's a supported processor
-                //int lastslash = FullFilename.LastIndexOf("\\");
-                //string infofile = FullFilename.Substring(0, lastslash) + "\\Debug\\" + "board.buildinfo";
-                //foreach (var line in System.IO.File.ReadLines(infofile))
-                //{
-                //    if (line.Contains("build.mcu"))
-                //    {
-                //        if (line.Contains("atmega328")) // uno, mini, nano
-                //            return true;
-                //        else
-                //        {
-                //            MessageBox.Show("QDebug does ot support your device. Please check for Arduino Uno, Mini or Nano");
-                //            return false;
-                //        }
-                //    }
-                //}
-                //MessageBox.Show("Cannot find target baord info. Please check taht you are using Arduino Uno, Mini or Nano");
+
                 return true;
             }
             return false;
@@ -192,32 +176,25 @@ namespace ArdDebug
             startInfo.RedirectStandardOutput = true;
             startInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
+            // see http://ccrma.stanford.edu/planetccrma/man/man1/avr-objdump.1.html
             startInfo.Arguments = "-S -l -C -t " + elfPath;
 
-            // disassembly file
+            // disassembly file 
             if (doObjDump(startInfo, ".lss") == false)
                 return false;
-            //if (ParseSourceInfo(ShortFilename) == false)
-            //    return false;
+
             if (ParseDisassembly(ShortFilename + ".lss") == false)
                 return false;
 
-            // debug info file
-            startInfo.Arguments = "-Wil " + elfPath;
+            // debug info file 
+            // see http://ccrma.stanford.edu/planetccrma/man/man1/readelf.1.html
+            startInfo.Arguments = "-Wilo " + elfPath;
             if (doObjDump(startInfo, ".dbg") == false)
                 return false;
             if (ParseDebugInfo(ShortFilename + ".dbg") == false)
                 return false;
 
-            //// line number table
-            //startInfo.Arguments = "-W " + elfPath;
-            //if (doObjDump(startInfo, ".lin") == false)
-            //    return false;
 
-            //startInfo.FileName = "avr-nm.exe";
-            //startInfo.Arguments = "-A -C -n -S  " + elfPath;
-            //if (doObjDump(startInfo, ".sym") == false)
-            //    return false;
 
             return true;
 

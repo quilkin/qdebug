@@ -40,6 +40,11 @@ namespace ArdDebug
 
         public string ReadLine(int timeout)
         {
+            //while (_Running.IsBusy)
+            //{ }
+            //while (comString != string.Empty)
+            //{
+            //}
             if (spmanager == null)
                 return null;
             string str = spmanager.ReadLine(timeout);
@@ -49,6 +54,9 @@ namespace ArdDebug
         }
         public string ReadLine()
         {
+            //while (comString != string.Empty)
+            //{
+            //}
             if (spmanager == null)
                 return null;
             string str = spmanager.ReadLine();
@@ -66,6 +74,7 @@ namespace ArdDebug
             //if (str.Length > 3)
                 UpdateCommsBox(str, true);
             spmanager.Send(str);
+            comString = string.Empty;
         }
 
     }

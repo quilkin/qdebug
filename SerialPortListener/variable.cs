@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
 
 namespace ArdDebug
 {
@@ -39,7 +40,21 @@ namespace ArdDebug
         }
     }
 
-
+    /// <summary>
+    /// Used for local variables in functions, tells us where to find them as teh program counter changes
+    /// </summary>
+    class LocationItem
+    {
+        // this is an example list of LocationItems (for a single variable) in the debug file:
+        // 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
+        // 000006b6 000004ca 000004fe (DW_OP_breg28 (r28): 5)
+        // 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
+        // 000006cf 00000508 0000050e (DW_OP_fbreg: -5)
+        // 000006db<End of list>
+        public UInt32 StartAddr { get; set; }
+        public UInt32 EndAddr  { get; set; }
+        public String Location { get; set; }
+    }
     class Variable
     {
 
@@ -58,21 +73,29 @@ namespace ArdDebug
         /// </summary>
         public UInt16 Address { get; set; }
         public string currentValue { get; set; }
+        public string lastValue { get; set; }
+
+        /// <summary>
+        /// Used for location of local variables
+        /// Just gives a pointer to the location section of the debug file
+        /// (used only temporarily while file is being parsed)
+        /// </summary>
+        public UInt16 Location { get; set; }
+        /// <summary>
+        /// A list of the actual locations of a local variable, found from the location section
+        /// </summary>
+        public List<LocationItem> Locations;
+
         private Arduino arduino;
         private String comString = String.Empty;
         public Variable(Arduino ard)
         {
             arduino = ard;
             currentValue = string.Empty;
+            Locations = new List<LocationItem>();
         }
 
-
-        //public void SetDetails(string type, UInt16 addr, int size, bool signed)
-        //{
-        //    Address = addr;
-
-        //}
-        public void GetValue()
+        public bool GetValue()
         {
              UInt16 requestedAddr = 0;
             UInt16 data = 0;
@@ -86,9 +109,10 @@ namespace ArdDebug
             comString = arduino.ReadLine();
 
             if (comString.Length < 5)
-                return ;
+                return false;
             if (Type == null)
-                return;
+                return false;
+            lastValue = currentValue;
             if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
             {
                 if (Type.Size == 1)
@@ -117,7 +141,7 @@ namespace ArdDebug
                         arduino.Send(sendStr);
                         comString = arduino.ReadLine();
                         if (comString.Length < 5)
-                            return;
+                            return false;
                         if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
                         {
                             bigdata = (UInt32)(datahi << 16) + data;
@@ -134,9 +158,41 @@ namespace ArdDebug
                     }
                 }
             }
-            //return currentValue;
+            return true;
         }
+        public ListViewItem CreateVarViewItem()
+        {
+ 
+            ListViewItem lvi = new ListViewItem();
+            lvi.Name = Name.ToString();
+            lvi.Text = Name.ToString();
+            if (Type == null)
+            {
+                MessageBox.Show("error parsing variables..." + Name + " has no type");
+                // var = null;
+                return null;
+            }
+            string typeName = Type.Name;
+            if (Type.BaseType != null)
+            {
+                // array type etc
+                if (Type.Name == "array")
+                {
+                    typeName = Type.BaseType.Name + " []";
 
+                }
+                else if (Type.Name == "pointer")
+                {
+                    typeName = Type.BaseType.Name + " *";
+                }
+            }
+            lvi.SubItems.Add(typeName);
+            lvi.SubItems.Add(Address.ToString("X"));
+            lvi.SubItems.Add(currentValue);
+            //varView.Items.Add(lvi);
+            return lvi;
+        }
+        
     }
 }
 

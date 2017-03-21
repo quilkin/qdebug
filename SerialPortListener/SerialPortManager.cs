@@ -8,6 +8,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.IO;
 using System.Management;
+using System.Windows.Forms;
 
 namespace ArdDebug.Serial
 {
@@ -159,8 +160,9 @@ namespace ArdDebug.Serial
             {
                 return _serialPort.ReadLine();
             }
-            catch
+            catch (Exception ex)
             {
+                MessageBox.Show(ex.Message);
                 return string.Empty;
             }
         }
@@ -211,7 +213,7 @@ namespace ArdDebug.Serial
            // _serialPort.Handshake = Handshake.RequestToSend;
             _serialPort.RtsEnable = true;
             _serialPort.DtrEnable = true;
-            _serialPort.ReadTimeout = 500;
+            _serialPort.ReadTimeout = 1000;
             // Subscribe to event and open serial port for data
             //_serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
             _serialPort.Open();

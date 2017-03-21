@@ -14,17 +14,9 @@ namespace ArdDebug
     {
         public Arduino(MainForm form)
         {
-            //this.stopLED = form.LedStopped;
-            //this.runLED = form.LedStopped;
-            //this.btnPause = form.Pause;
-            //this.btnRun = form.Run;
-            //this.btnStart = form.Start;
-            //this.btnStep= form.Step;
-            //this.btnStepOver = form.StepOver;
             GUI = form;
             GUI.RunButtons(false);
-            
-
+   
         }
         private MainForm GUI;
         private ListView source, disassembly, varView;
@@ -34,16 +26,9 @@ namespace ArdDebug
 
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
         private List<Variable> Variables = new List<Variable>();
+        private List<Variable> MyVariables = new List<Variable>();
         private List<VariableType> VariableTypes = new List<VariableType>();
         private List<Function> Functions = new List<Function>();
-
-        /// <summary>
-        /// variable names found by parsing the assembler file, included in our own source files
-        /// Just used for comaprison when parsing full list of variables which contain eveything
-        /// </summary>
-        //private List<String> MyVariables = new List<String>();
-
-       // private List<String> MyFunctions = new List<String>();
 
         /// <summary>
         /// where program counter is currently sitting
@@ -53,10 +38,8 @@ namespace ArdDebug
         /// next place to stop if we skip over a function call
         /// </summary>
         private Breakpoint nextBreakpoint = null;
-        private Panel stopLED, runLED;
         private String comString = String.Empty;
-        private Button btnStart, btnStep, btnStepOver, btnRun, btnPause;
-
+ 
         /// <summary>
         /// source file reference from .elf file
         /// </summary>
@@ -80,7 +63,8 @@ namespace ArdDebug
             "float",
             "double",
             "long",
-            "volatile"
+            "volatile",
+            "const",
         };
         public  IList<string> TypedefWords = new List<string> {
             "word",
@@ -100,12 +84,10 @@ namespace ArdDebug
 
         public void Startup(Serial.SerialPortManager _spmanager)
         {
-            
 
-            GUI.RunButtons(false);
             this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
-            comString = null;
+            comString = string.Empty;
             currentBreakpoint = null;
             nextBreakpoint = null;
             Send("startup\n");
@@ -123,87 +105,110 @@ namespace ArdDebug
             varView.Enabled = true;
         }
 
-        //delegate void varViewDelegate();
-        public void SingleStep()
+        public enum FunctionType : byte { None, Mine, Other };
+
+        /// <summary>
+        /// See if this line calls a  function; if so is it one of ours?
+        /// </summary>
+        /// <returns></returns>
+        FunctionType FindFunctionWithinLine()
+        {
+            if (currentBreakpoint != null)
+            {
+ 
+                int line = currentBreakpoint.SourceLine;
+                ListViewItem sourceItem = source.Items[line - 1];
+                string sourceLine = sourceItem.SubItems[2].Text;
+                FunctionType fType = FunctionType.None;
+                foreach (Function func in Functions)
+                {
+                    if (sourceLine.Contains(func.Name))
+                    {
+                        fType = FunctionType.Other;
+                        if (func.fileRef == sourceFileRef)
+                            fType = FunctionType.Mine;
+                        break;
+                    }
+                }
+                return fType;
+
+            }
+            return FunctionType.None;
+        }
+
+        delegate void SingleStepDelegate(bool funcChecked);
+
+        public void SingleStep(bool funcChecked = false)
         {
             if (source.InvokeRequired)
             {
-                varViewDelegate d = new varViewDelegate(SingleStep);
-                varView.Invoke(d, new object[] { });
+                SingleStepDelegate d = new SingleStepDelegate(SingleStep);
+                varView.Invoke(d, new object[] { funcChecked });
             }
             else
             {
-                if (currentBreakpoint != null)
+                try
                 {
-                    // see if this line calls a library function (especially delay())
-                    // if so, step over rather than into it.
-                    int line = currentBreakpoint.SourceLine;
-                    ListViewItem sourceItem = source.Items[line-1];
-                    string sourceLine = sourceItem.SubItems[2].Text;
-                    bool isAnyFunction = false;
-                    bool isMyFunction = false;
-                    foreach (Function func in Functions)
+                    if (!funcChecked)
                     {
-                        if (sourceLine.Contains(func.Name))
+                        FunctionType fType = FindFunctionWithinLine();
+                        if (fType == FunctionType.Other)
                         {
-                            isAnyFunction = true;
-                            if (func.fileRef == sourceFileRef)
-                                isMyFunction = true;
-                            break;
+                            // if so, step over rather than into it.
+                            StepOver(true);
+                            return;
                         }
                     }
-                    if (isAnyFunction==true && isMyFunction==false)
-                    {
-                        StepOver();
-                        return;
-                    }
-                  }
 
-                String stepStr = "P0000\n";
-                //bool continuing = true;
-                Send(stepStr);
-                //Leds(true);
-                GUI.RunButtons(false);
-                // make this a backgroud task so that we can abort, if required, with the 'pause' button
-                _Running = new BackgroundWorker();
-                _Running.WorkerSupportsCancellation = true;
-                _Running.DoWork += new DoWorkEventHandler((state, args) =>
+                    String stepStr = "P0000\n";
+                    Send(stepStr);
+                    GUI.RunButtons(false);
+                    // make this a backgroud task so that we can abort, if required, with the 'pause' button
+                    _Running = new BackgroundWorker();
+                    _Running.WorkerSupportsCancellation = true;
+                    _Running.DoWork += new DoWorkEventHandler((state, args) =>
+                    {
+                        do
+                        {
+                            comString = ReadLine();
+                            if (comString.Length == 0)
+                            {
+                                MessageBox.Show("timeout in single step");
+                                break;
+                            }
+                            if (_Running.CancellationPending)
+                            {
+                                // force device to think it's reached its target
+                                Send("Y");
+                                break;
+                            }
+                            char firstChar = comString[0];
+                            if (firstChar == 'P')
+                            {
+                                // moved to where we need; this is our 'step'
+                                //continuing = false;
+                                newProgramCounter();
+                                GetVariables();
+                                break;
+                            }
+                            else if (firstChar == 'S')
+                            {
+                                string reply = newProgramCounter();
+                                Send(reply);
+
+                            }
+                        }
+                        while (true);
+
+                        GUI.RunButtons(true);
+                    });
+                    _Running.RunWorkerAsync();
+                }
+                catch (Exception ex)
                 {
-                    do
-                    {
-                        comString = ReadLine();
-                        if (comString.Length == 0)
-                        {
-                            MessageBox.Show("timeout in single step");
-                            break;
-                        }
-                        if (_Running.CancellationPending)
-                        {
-                        // force device to think it's reached its target
-                        Send("Y");
-                            break;
-                        }
-                        char firstChar = comString[0];
-                        if (firstChar == 'P')
-                        {
-                        // moved to where we need; this is our 'step'
-                        //continuing = false;
-                        newProgramCounter();
-                            GetVariables();
-                            break;
-                        }
-                        else if (firstChar == 'S')
-                        {
-                            string reply = newProgramCounter();
-                            Send(reply);
+                    MessageBox.Show(ex.Message, "Sorry there has been a problem");
+                }
 
-                        }
-                    }
-                    while (true);
-                //Leds(false);
-                GUI.RunButtons(true);
-                });
-                _Running.RunWorkerAsync();
             }
 
         }
@@ -211,15 +216,21 @@ namespace ArdDebug
         /// <summary>
         /// need to set a temporary breakpoint, avoiding any function calls
         /// </summary>
-        public void StepOver()
+        public void StepOver(bool funcChecked = false)
         {
-            //Leds(true);
-            GUI.RunButtons(false);
+            if (!funcChecked)
+            {
+                FunctionType fType = FindFunctionWithinLine();
+                if (fType == FunctionType.None)
+                {
+                    SingleStep(true);
+                    return;
+                }
+            }
+
             if (nextBreakpoint != null)
             {
-                //// set up a 'temporary' breakpoint
-                //Breakpoint bp = new Breakpoint("", 0);
-                //bp.ProgramCounter = nextBreakpoint;
+
                 currentBreakpoint = nextBreakpoint;
                 GoToBreakpoint(nextBreakpoint);
             }
@@ -227,8 +238,6 @@ namespace ArdDebug
             {
                 MessageBox.Show("Error, no suitable step found");
             }
-            //Leds(false);
-            GUI.RunButtons(true);
         }
 
         public void FindBreakpoint()
@@ -252,188 +261,208 @@ namespace ArdDebug
         public BackgroundWorker _Running = null;
         public void GoToBreakpoint(Breakpoint bp)
         {
-            String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
-            Send(sendStr);
-           // comString = ReadLine();     // should be 'Txxxx' - echo adrees that was sent.
-                                        // now wait for the bp to be hit.....or a pause command
-            _Running = new BackgroundWorker();
-            _Running.WorkerSupportsCancellation = true;
-            bool pauseReqd = false;
-
-            GUI.RunButtons(false);
-            _Running.DoWork += new DoWorkEventHandler((state, args) =>
+            try
             {
-                do
-                {
-                    comString = ReadLine(); // waiting for "?"...DoWeNeedToStop?
-                    if (comString.Length > 0)
-                    {
-                        if (comString[0] == '?')
-                        {
-                            //check for pause button just pressed
-                            if (_Running.CancellationPending)
-                            {
-                                Send("X");        // instruction to force targetPC to be equal to current PC
-                                pauseReqd = true;
-                                break;
-                            }
-                            else
-                            {
-                                Send("N");
-                            }
-                        }
-                        else // reached predefined breakpoint
-                            break;
-                    }
-                } while (true);
-                Thread.Sleep(100); //allow time for target to catch up
-                GetVariables();
-                if (pauseReqd)
-                    SingleStep();  // not sure why this is needed; variables don't update otherwise
-                UpdateVariableWindow();
-                UpdateCodeWindows(bp.ProgramCounter);
-                if (!pauseReqd && bp.Manual)
-                    MarkBreakpointHit(bp);
+                String sendStr = "P" + bp.ProgramCounter.ToString("X4") + "\n";
+                Send(sendStr);
 
-                GUI.RunButtons(true);
-            });
-            _Running.RunWorkerAsync();
+                // now wait for the bp to be hit.....or a pause command
+                _Running = new BackgroundWorker();
+                _Running.WorkerSupportsCancellation = true;
+                bool pauseReqd = false;
+
+                GUI.RunButtons(false);
+                _Running.DoWork += new DoWorkEventHandler((state, args) =>
+                {
+                    do
+                    {
+                        comString = ReadLine(); // waiting for "?"...DoWeNeedToStop?
+                        if (comString.Length > 0)
+                        {
+                            if (comString[0] == '?')
+                            {
+                                //check for pause button just pressed
+                                if (_Running.CancellationPending)
+                                {
+                                    Send("X");        // instruction to force targetPC to be equal to current PC
+                                    pauseReqd = true;
+                                    break;
+                                }
+                                else
+                                {
+                                    Send("N");
+                                }
+                            }
+                            else // reached predefined breakpoint
+                                break;
+                        }
+                    } while (true);
+                    Thread.Sleep(100); //allow time for target to catch up
+                    GetVariables();
+
+                    //UpdateVariableWindow();
+                    UpdateCodeWindows(bp.ProgramCounter);
+                    if (!pauseReqd && bp.Manual)
+                        MarkBreakpointHit(bp);
+                    GUI.RunButtons(true);
+                });
+                _Running.RunWorkerAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Sorry there has been a problem");
+            }
         }
         
     
 
         public void GetVariables()
         {
-            //Leds(true);
-            GUI.RunButtons(false);
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
             System.Threading.Thread.Sleep(100);
             foreach (Variable var in Variables)
             {
-                //GetVariable(var);
-                var.GetValue();
+                 if (var.GetValue() == false)
+                {
+                    break;
+                }
             }
             UpdateVariableWindow();
-            //Leds(false);
-            GUI.RunButtons(true);
+
         }
 
-        //private int expandedTags = 0;
+        
+        /// <summary>
+        /// A list of variables which have been 'expanded' to show contents (of arrays etc)
+        /// </summary>
         private List<ListViewItem> expandedItems = new List<ListViewItem>();
+
+        /// <summary>
+        /// Attempt to expand a compound variable by clicking on its row
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         public void Variable_Click(object sender, EventArgs e)
         {
             if (varView.SelectedItems.Count == 0)
                 return;
-
-            ListViewItem clicked = varView.SelectedItems[0];
-            string itemName = clicked.Name;
-            Variable var = Variables.Find(x => x.Name == itemName);
-            if (var == null)
-                return;
-            if (var.Type.BaseType == null)
-                return;
-
-            if (expandedItems.Contains(clicked)==false)
+            try
             {
-                // expand item to show contents of this compound variable
-                int size = var.Type.Size;
-                int index = clicked.Index;
-                ushort addr = var.Address;
-                //clicked.Tag = ++expandedTags;
-                expandedItems.Add(clicked);
+                ListViewItem clicked = varView.SelectedItems[0];
+                string itemName = clicked.Name;
+                Variable var = Variables.Find(x => x.Name == itemName);
+                if (var == null)
+                    return;
+                if (var.Type.BaseType == null)
+                    // if type is already a base type it can't be expanded
+                    return;
 
-                if (var.Type.Name == "pointer")
+                if (expandedItems.Contains(clicked) == false)
                 {
-                    // get the value pointed to
-                    Variable pointerElement = new Variable(this);
-                    Variable indirect = new Variable(this);
+                    // This row is not expanded.
+                    // Expand item to show contents of this compound variable
+                    int size = var.Type.Size;
+                    int index = clicked.Index;
+                    ushort addr = var.Address;
 
-                    pointerElement.Address = addr;
-                    pointerElement.Type = var.Type.BaseType;
-                    pointerElement.Name = "* " + itemName ;
-                    Variables.Add(pointerElement);
-                    pointerElement.GetValue();
-                    // now get the indirected value
-                    int indAddr = -1;
-                    int.TryParse(pointerElement.currentValue, out indAddr);
-                    if (indAddr >= 0)
+                    // note that this row is expanded, so we can contract it again later
+                    expandedItems.Add(clicked);
+
+                    if (var.Type.Name == "pointer")
                     {
+                        // get the value pointed to
+                        //Variable pointerElement = new Variable(this);
+                        Variable indirect = new Variable(this);
+
+                        // get the indirected value of this pointer
+                        int indAddr = -1;
+                        //int.TryParse(pointerElement.currentValue, out indAddr);
+                        int.TryParse(var.currentValue, out indAddr);
+                        if (indAddr < 0)
+                            return;
+
+                        // successful address found; create a new variable to show its content
                         indirect.Address = (ushort)indAddr;
                         indirect.Type = var.Type.BaseType;
-                        indirect.Name = "*"+var.Type.Name;
+                        indirect.Name = "*" + var.Name;
                         // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
                         Variables.Add(indirect);
+                        // ask the device for the value of the indirected variable
                         indirect.GetValue();
 
+                        // create a new row and display it
+                        string[] items = { "  " + indirect.Name, var.Type.BaseType.Name, "0x" + indAddr.ToString("X4"), indirect.currentValue };
+                        ListViewItem indirectItem = new ListViewItem(items);
+                        indirectItem.Name = indirect.Name;
+                        indirectItem.BackColor = System.Drawing.Color.Azure;
+                        varView.Items.Insert(++index, indirectItem);
+
+                        // tag the new row with the row that was expanded, so we can easily unexpand later
+                        clicked.Tag = var.Address;      // this should be unique
+                        indirectItem.Tag = clicked.Tag;
                     }
-                    string[] items = { "  " + pointerElement.Name, var.Type.BaseType.Name, "0x"+indAddr.ToString("X4"), indirect.currentValue };
-                    ListViewItem arrayItem = new ListViewItem(items);
-                    arrayItem.Name = pointerElement.Name;
-                    arrayItem.BackColor = System.Drawing.Color.Azure;
-                    arrayItem.Tag = clicked.Index;
-                    //viewTags.Add(clicked.Tag);
-                    varView.Items.Insert(++index, arrayItem);
-                    //clicked.Tag = "expandedPointer";
+                    else
+                    {
+                        // get the individual array elements from memory
+                        for (int i = 0; i < size; i++)
+                        {
+                            Variable arrayElement = new Variable(this);
+
+                            arrayElement.Address = addr;
+                            arrayElement.Type = var.Type.BaseType;
+                            arrayElement.Name = itemName + '[' + i + ']';
+                            // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
+                            Variables.Add(arrayElement);
+
+                            arrayElement.GetValue();
+
+                            // create a new row and display it
+                            string[] items = { "  " + arrayElement.Name, var.Type.BaseType.Name, addr.ToString("X4"), arrayElement.currentValue };
+                            ListViewItem arrayItem = new ListViewItem(items);
+                            arrayItem.Name = arrayElement.Name;
+                            arrayItem.BackColor = System.Drawing.Color.Azure;
+                            varView.Items.Insert(++index, arrayItem);
+
+                            // tag the new row with the row that was expanded, so we can easily unexpand later
+                            clicked.Tag = var.Address;      // this should be unique
+                            arrayItem.Tag = clicked.Tag;
+
+                            // get ready for next member of array
+                            addr += (ushort)var.Type.BaseType.Size;
+                        }
+
+                    }
+                    UpdateVariableWindow();
                 }
                 else
                 {
-                    // get the individual array elements from memory
-                    for (int i = 0; i < size; i++)
-                    {
-                        Variable arrayElement = new Variable(this);
-                        
-                        arrayElement.Address = addr;
-                        arrayElement.Type = var.Type.BaseType;
-                        arrayElement.Name = itemName + '[' + i + ']';
-                        // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
-                        Variables.Add(arrayElement);
-                        //GetVariable(arrayElement);
-                        arrayElement.GetValue();
+                    // This row has already been expanded.
+                    // Unexpand the added items, and remove the extra temporary variables
 
-                        string[] items = { "  " + arrayElement.Name, var.Type.BaseType.Name, addr.ToString("X4"), arrayElement.currentValue };
-                        ListViewItem arrayItem = new ListViewItem(items);
-                        arrayItem.Name = arrayElement.Name;
-                        arrayItem.BackColor = System.Drawing.Color.Azure;
-                        arrayItem.Tag = clicked.Index;
-                        //viewTags.Add(clicked.Tag);
-                        varView.Items.Insert(++index, arrayItem);
-                        addr += (ushort)var.Type.BaseType.Size;
-                    }
-                    //clicked.Tag = "expandedArray";
-                }
-                UpdateVariableWindow();
-                //clicked.Tag = "expanded";
-            }
-            else
-            {
-                // unexpand the added items, and remove the extra temporary variables
-                foreach (ListViewItem expandedItem in expandedItems)
-                {
-                    if (expandedItem == clicked)
-                        break;
-                }
- 
-                foreach (ListViewItem item in varView.Items)
-                {
-                    if (item.Tag != null)
+                    foreach (ListViewItem item in varView.Items)
                     {
-                        if ((int)item.Tag == clicked.Index)
+                        if (item.Tag != null && item != clicked)
                         {
-                            string varName = item.Name;
-                            Variable arrayVar = Variables.Find(x => x.Name == varName);
-                            Variables.Remove(arrayVar);
-                            varView.Items.Remove(item);
+                            // this was an expanded row. Was it expanded under the row that was clicked?
+                            if (item.Tag.ToString() == clicked.Tag.ToString())
+                            {
+                                // yes, remove it
+                                string varName = item.Name;
+                                Variable arrayVar = Variables.Find(x => x.Name == varName);
+                                Variables.Remove(arrayVar);
+                                varView.Items.Remove(item);
+                            }
                         }
                     }
+                    expandedItems.Remove(clicked);
+                    clicked.Tag = null;
                 }
-                expandedItems.Remove(clicked);
-                //viewTags.Remove(clicked.Tag);
-                clicked.Tag = null;
-
-
-             }
-
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Sorry there has been a problem");
+            }
         }
 
         /// <summary>
@@ -482,7 +511,7 @@ namespace ArdDebug
                     }
                     else if (var.Type.Name == "pointer")
                     {
-                        // show addreess pointed to (in hex)
+                        // show address pointed to (in hex)
                         int addr=-1;
                         int.TryParse(var.currentValue, out addr);
                         if (addr >= 0)
@@ -491,6 +520,32 @@ namespace ArdDebug
                         }
             
                     }
+                    if (var.currentValue != var.lastValue)
+                    {
+                        lvi.ForeColor = System.Drawing.Color.Red;
+                        // if this is a pointer, and it has changed, 
+                        //   we need to also find a new value for the value pointed to, if it's currently displayed
+                        if (var.Type.Name == "pointer")
+                        {
+                            // get the indirected value of this pointer
+                            ushort indAddr = 0;
+                            if (ushort.TryParse(var.currentValue, out indAddr))
+                            {
+                                // if it's currently displayed it will be in the list
+                                var indirect = Variables.Find(x => x.Name == "*" + var.Name);
+                                if (indirect != null)
+                                {
+                                    indirect.Address = indAddr;
+                                    indirect.GetValue();
+                                }
+                             }
+                        }
+                    }
+                    else
+                    {
+                        lvi.ForeColor = System.Drawing.Color.Black;
+                    }
+                    var.lastValue = var.currentValue;
 
 
                 }

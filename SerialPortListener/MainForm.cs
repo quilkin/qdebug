@@ -24,15 +24,6 @@ namespace ArdDebug
             UserInitialization();
         }
 
-        //// controls need by Arduino logic
-        //public Panel LedRunning { get { return panelRunning; } }
-        //public Panel LedStopped { get { return panelStopped; } }
-        //public Button Start     {  get { return btnStart; } }
-        //public Button Step      { get { return buttonStep; } }
-        //public Button StepOver  { get { return buttonStepOver; } }
-        //public Button Run       { get { return buttonRun; } }
-        //public Button Pause     { get { return buttonPause; } }
-
         private void UserInitialization()
         {
             _spManager = new SerialPortManager();
@@ -94,17 +85,23 @@ namespace ArdDebug
                 this.buttonLoad.Select();
                 return;
             }
-            
-
+            RunButtons(false);
+            buttonStep.Enabled = false;
+            buttonStepOver.Enabled = false;
+            buttonRun.Enabled = false;
+            buttonPause.Enabled = false;
             Arduino.Startup(_spManager);
-
-
         }
 
         // Handles the "Stop Listening"-buttom click event
         private void btnStop_Click(object sender, EventArgs e)
         {
             _spManager.StopListening();
+            RunButtons(true);
+            buttonStep.Enabled = false;
+            buttonStepOver.Enabled = false;
+            buttonRun.Enabled = false;
+            buttonPause.Enabled = false;
         }
 
         private void buttonPause_Click(object sender, EventArgs e)

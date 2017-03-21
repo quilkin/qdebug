@@ -7,21 +7,69 @@ namespace ArdDebug
 {
     partial class Arduino
     {
+        private void LookForInitialisedVariables(string line)
+        {
+            // see which (simple) variables are initialised here
+            // Need to know so we can scheck for no-allowed use of i/o pin 7
+            // looking for something like "const int buttonPin = 6; "
 
+            string line2 = line;
+            if (line2.Length < 3)
+                return;
+            if (line2.IndexOf('(') >= 0)
+                return;  // function call or definition, not a variable
+
+            char[] delimiters = new char[] { ' ',';' };
+            string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1)
+                return;
+            if (parts[0].StartsWith("#"))
+                return;
+            if (parts[0].StartsWith("//"))
+                return;
+
+
+            if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
+            {
+                // should be a variable declaration. 
+                // find first word that is NOT in the reserved lists
+                 for (int p = 1; p < parts.Length; p++)
+                {
+                    string part = parts[p];
+                    if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
+                    {
+                        continue;
+                    }
+                    Variable var = new Variable(this);
+                    var.Name = part;
+                    if (p+2 < parts.Length)
+                    {
+                        int val;
+                        string valString = parts[p + 2];
+                        if (int.TryParse(valString, out val))
+                        {
+                            var.currentValue = valString;
+                            // do't need to save type in this case
+                            MyVariables.Add(var);
+                        }
+                    }
+                    break;
+                }
+
+            }
+        }
 
         private bool parseSourceFile()
         {
-           // List<string> TypeDefWords = new List<string>();
 
             source.Items.Clear();
             disassembly.Items.Clear();
             varView.Items.Clear();
             Variables.Clear();
-           // MyVariables.Clear();
+            MyVariables.Clear();
             Functions.Clear();
             int count = 1;
             int SerialLine = 0;
-           // bool qdebugHeaderFound = false;
             bool qdebugConstrFound = false;
             foreach (var line in System.IO.File.ReadLines(FullFilename))
             {
@@ -30,6 +78,7 @@ namespace ArdDebug
                 string untabbed = line.Replace("\t", "    ");
                 string trimmed = line.Trim();
 
+                LookForInitialisedVariables(line);
 
                 ListViewItem lvi = new ListViewItem();
                 lvi.Text = ""; // for breakpoint markers
@@ -40,6 +89,29 @@ namespace ArdDebug
 
                 if (line.Contains("QDebug"))
                     qdebugConstrFound = true;
+
+                if (line.Contains("pinMode"))
+                {
+                    // check to see if pin 7 is being used. Can't allow this.
+                    char[] delimiters = new char[] { ' ', '(' , ')', ','};
+                    string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 2)
+                    {
+                        string pinDefString = parts[1];
+                        Variable var = MyVariables.Find(x => x.Name == pinDefString);
+                        if (var != null)
+                        {
+                            int val;
+                            if (int.TryParse(var.currentValue, out val))
+                            {
+                                if (val == 7)
+                                {
+                                    MessageBox.Show("Use of Pin 7 has been found.  Sorry, pin 7 cannot be used with Qdebug. Please change pin being used, or ignore this warning (and send sketch to our support) if Qdebug has mistaken the pin. ", "Warning!");
+                                }
+                            }
+                        }
+                    }
+                }
                 int index = line.IndexOf("Serial.");
                 int comment = line.IndexOf("//");
                 if (index >= 0)
@@ -57,11 +129,7 @@ namespace ArdDebug
                 MessageBox.Show("Sorry, cannot have 'Serial' commands, these are used by the debugger.\n Please comment out or use 'SoftwareSerial', then reload file");
                 return false;
             }
-            //if (qdebugHeaderFound == false && ShortFilename.EndsWith(".ino"))
-            //{
-            //    MessageBox.Show("You must #include \"qdebug.h\" at the top of your file");
-            //    return false;
-            //}
+
             if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
             {
                 MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
@@ -72,102 +140,13 @@ namespace ArdDebug
 
         }
 
-        private void LookForOurVariables()
-        {
-            // see which variables declared here
-            // Need to know so we can separate our own vars from all the library ones, when we parse the debug file
-
-            // looking for something like "  int locali = iii*3;"
-            // or                        "unsigned int ms = 0;"
-            // or just                  "float numf;"
-            // or                       "unsigned long ms;"
-            // or                       "char array[10];"
-            // or                       "char *pointer;"
-            // but not if there's a function definition here
-            // and not an assignment e.g. " ms = 3;"
-            // or                         " array [x] = 3;"
-
-
-            //string line2 = line;
-            //if (line2.Length < 3)
-            //    continue;
-            //if (line2.IndexOf('(') >= 0)
-            //    continue;  // function call or definition, not a variable
-
-            //int equals = line2.IndexOf('=');
-            //if (equals > 0)
-            //{
-            //    // get rid of any assignments made with the var name, not interested at this stage
-            //    line2 = line2.Substring(0, equals);
-            //}
-            //char[] delimiters = new char[] { ' ', '[' };
-            //string[] parts = line2.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-            //if (parts.Length < 1)
-            //    continue;
-            //if (parts[0].StartsWith("#"))
-            //{
-            //    if (line.Contains("qdebug.h"))
-            //        qdebugHeaderFound = true;
-            //    continue;
-            //}
-            //if (parts[0].StartsWith("//"))
-            //    continue;
-
-            //if (parts[0] == "typedef")
-            //{
-            //    // should be a typedef declaration.
-            //    // find first following word that is NOT in the reserved lists
-            //    string typeName = null;
-            //    for (int p = 1; p < parts.Length; p++)
-            //    {
-            //        string part = parts[p];
-            //        if (part.EndsWith(";"))
-            //        {
-            //            part = part.Substring(0, part.Length - 1);
-            //        }
-            //        if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
-            //        {
-            //            continue;
-            //        }
-            //        typeName = part;
-            //        TypedefWords.Add(typeName);
-            //        break;
-            //    }
-
-            //}
-
-
-            //if (ReservedTypeWords.Contains(parts[0]) || TypedefWords.Contains(parts[0]))
-            //{
-            //    // should be a variable declaration. Might be local (deal with that later.....)
-            //    // find first word that is NOT in the reserved lists
-            //    string varName = null;
-            //    for (int p = 1; p < parts.Length; p++)
-            //    {
-            //        string part = parts[p];
-            //        if (part.EndsWith(";"))
-            //        {
-            //            part = part.Substring(0, part.Length - 1);
-            //        }
-            //        if (ReservedTypeWords.Contains(part) || TypedefWords.Contains(part))
-            //        {
-            //            continue;
-            //        }
-            //        varName = part;
-            //        break;
-            //    }
-            //    if (varName != null)
-            //    {
-            //        MyVariables.Add(varName);
-            //    }
-            //}
-        }
-
         private bool ParseDebugInfo(string file)
         {
             Variable var = null;
             VariableType varType = null;
             Function func = null;
+            bool inLocationSection = false;
+            //bool inLocationVariable = false;
 
             sourceFileRef = 0;
 
@@ -180,21 +159,26 @@ namespace ArdDebug
             //  <6cb>   DW_AT_name        : int
             VariableTypes.Clear();
 
-            //FileStream dbg = File.OpenRead(file);
             // first find the entry in the File Name Table so we can se which vars are in our source file
+            int linecount = 0;
             foreach (string line in File.ReadLines(file))
             {
+
                 if (line.Contains(ShortFilename))
                 {
                     if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
                     {
-                        // 8 3   0   0   qdebugtest.ino
-                        char[] delimiters = new char[] { ' ', '\t' };
-                        string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                        int.TryParse(parts[0], out sourceFileRef);
-                        break;
+                        if (line.Contains("DW_AT_name") == false)
+                        {
+                            // 8 3   0   0   qdebugtest.ino
+                            char[] delimiters = new char[] { ' ', '\t' };
+                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                            int.TryParse(parts[0], out sourceFileRef);
+                            break;
+                        }
                     }
                 }
+                ++linecount;
             }
             if (sourceFileRef== 0)
             {
@@ -293,6 +277,7 @@ namespace ArdDebug
             }
 
             // find typedefs and volatiles) next
+
             //  for now, we will effectively promote a typedef type to it's base type
 
  //< 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
@@ -485,18 +470,23 @@ namespace ArdDebug
 
             }
 
-            // now find the variables themselves. Remove old ones first. Also find our own functions, so we can skip over library functions
+            // now find the variables themselves. Remove old ones first.
+            // Also find our own functions, so we can get loval variables inside them
             varView.Items.Clear();
             varView.Sorting = SortOrder.None;
             
             foreach (string line in File.ReadLines(file))
             {
-                
-                if (line.Contains(".debug_line"))
+                if (inLocationSection & line.Length > 10)
                 {
-                    // end of the bit we are interested in
-                    break;
+                    var = ParseLocations(line, var);
+                    continue;
                 }
+                //if (line.Contains(".debug_line"))
+                //{
+                //    // end of the bit we are interested in
+                //    break;
+                //}
                 //// looking for info like this, to find location of our variables ('numf' is a global in this example)
                 //< 1 >< 1fa7 >: Abbrev Number: 78(DW_TAG_variable)
                 //  < 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): numf
@@ -513,13 +503,16 @@ namespace ArdDebug
                         //  or          "< 1fa8 > DW_AT_name        : num2"
                         int index = line.LastIndexOf(':');
                         String name = line.Substring(index + 1).Trim();
-                        if (func != null)
+                        if (func != null && func.Name != null && var != null)
+                        {
+                            // this is a local var in a func, must modify its name
+                            var.Name = func.Name + "." + name;
+                        }
+                        else if (func != null)
                         {
                             func.Name = name;
                         }
                         // We're only interested in vars that occur in our own files, not library files
-                        // Also, only global vars for now.
-                        //if (MyVariables.Contains(name))
                         else
                         {
                             var.Name = name;
@@ -565,7 +558,16 @@ namespace ArdDebug
                             }
                             else if (func != null)
                             {
-                                func.fileRef = fileRef;
+                                if (fileRef == sourceFileRef)
+                                {
+                                    // this variable is part of our source file
+                                    func.fileRef = fileRef;
+                                }
+                                else
+                                {
+                                    func= null;  // ignore and get ready for next one
+                                }
+
                             }
 
                         }
@@ -574,51 +576,89 @@ namespace ArdDebug
                             MessageBox.Show("error parsing variables..." + line);
                         }
                     }
+                    else if (line.Contains("DW_AT_artificial") && func != null)
+                    {
+                        func = null;  // ignore and get ready for next one
+
+                    }
                     else if (line.Contains("DW_AT_location") && var != null)
                     {
+                        int index1, index2;
+                        string refStr;
                         if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
                         {
-                            // local or register var, not dealing with these yet
-                            var = null;  // get ready for next one
-                            continue;
+                            // local or register var
+                            if (func == null || func.Name == null)
+                            {
+                                // not in a  functon so not interested
+                                var = null;  // get ready for next one
+                                continue;
+                            }
+                            else if (line.Contains("location list"))
+                            {
+                                // This is in a function. First need to mofify the param name with the function name
+                               // var.Name = func.Name + "." + var.Name;
+                                // start to find location of local variable or formal parameter
+                                //   < 14f7 > DW_AT_location    : 0x656(location list)
+                                index1 = line.LastIndexOf(':');
+                                index2 = line.LastIndexOf('(');
+                                if (index1 < 0 || index2 < 0)
+                                    continue;
+                                UInt16 location = 0;
+                                refStr = line.Substring(index1 + 4, index2 - index1 - 4);
+                                if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out location))
+                                {
+                                    var.Location = location;
+                                    Variables.Add(var);
+                                    varView.Items.Add(var.CreateVarViewItem());
+                                    continue;
+                                }
+                                else
+                                {
+                                    MessageBox.Show("error parsing variables..." + var.Name + " has no location");
+                                    var = null;
+                                    continue;
+                                }
 
+                            }
                         }
-                        int index1 = line.LastIndexOf(':');
-                        int index2 = line.LastIndexOf(')');
+                        index1 = line.LastIndexOf(':');
+                        index2 = line.LastIndexOf(')');
                         if (index1 < 0 || index2 < 0)
                             continue;
                         UInt32 loc = 0;
-                        string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                        refStr = line.Substring(index1 + 1, index2 - index1 - 1);
                         if (uint.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
                         {
                             var.Address = (ushort)(loc & 0xFFFF);
                             Variables.Add(var);
-                            ListViewItem lvi = new ListViewItem();
-                            lvi.Name = var.Name.ToString();
-                            lvi.Text = var.Name.ToString();
-                            if (var.Type == null)
-                            {
-                                MessageBox.Show("error parsing variables..." + var.Name + " has no type");
-                                var = null;
-                                continue;
-                            }
-                            string typeName = var.Type.Name;
-                            if (var.Type.BaseType != null)
-                            {
-                                // array type etc
-                                if (var.Type.Name == "array")
-                                {
-                                    typeName = var.Type.BaseType.Name + " []";
+                            ListViewItem lvi = var.CreateVarViewItem();
+                            //ListViewItem lvi = new ListViewItem();
+                            //lvi.Name = var.Name.ToString();
+                            //lvi.Text = var.Name.ToString();
+                            //if (var.Type == null)
+                            //{
+                            //    MessageBox.Show("error parsing variables..." + var.Name + " has no type");
+                            //    var = null;
+                            //    continue;
+                            //}
+                            //string typeName = var.Type.Name;
+                            //if (var.Type.BaseType != null)
+                            //{
+                            //    // array type etc
+                            //    if (var.Type.Name == "array")
+                            //    {
+                            //        typeName = var.Type.BaseType.Name + " []";
 
-                                }
-                                else if (var.Type.Name == "pointer")
-                                {
-                                    typeName = var.Type.BaseType.Name + " *";
-                                }
-                            }
-                            lvi.SubItems.Add(typeName);
-                            lvi.SubItems.Add(var.Address.ToString("X"));
-                            lvi.SubItems.Add(var.currentValue);
+                            //    }
+                            //    else if (var.Type.Name == "pointer")
+                            //    {
+                            //        typeName = var.Type.BaseType.Name + " *";
+                            //    }
+                            //}
+                            //lvi.SubItems.Add(typeName);
+                            //lvi.SubItems.Add(var.Address.ToString("X"));
+                            //lvi.SubItems.Add(var.currentValue);
                             varView.Items.Add(lvi);
                             var = null;  // get ready for next one
                         }
@@ -627,9 +667,9 @@ namespace ArdDebug
                             MessageBox.Show("error parsing variables..." + line);
                         }
                     }
-                    else if (line.Contains("DW_AT_sibling") && func != null)
+                    else if ((line.Contains("DW_TAG_subprogram") || line.Contains("DW_TAG_GNU_call_site")) && func != null)
                     {
-                        // done with this func
+                        // done with this func, onto the next.
                         if (func.Name != null && func.Name.Length > 0)
                         {
                             Functions.Add(func);
@@ -637,7 +677,7 @@ namespace ArdDebug
                         func = null;
                     }
                 }
-                if (line.Contains("DW_TAG_variable") )
+                if (line.Contains("DW_TAG_variable") || line.Contains("DW_TAG_formal_parameter"))
                 {
                     var = new Variable(this);
    
@@ -646,16 +686,135 @@ namespace ArdDebug
                 {
                     func = new Function();
                 }
+                else if (line.Contains(".debug_loc"))
+                {
+                    inLocationSection = true;
+                    var = null;
+                }
             }
 
             return true;
         }
 
+        void AddToVarView(Variable var)
+        {
+            ListViewItem lvi = new ListViewItem();
+            lvi.Name = var.Name.ToString();
+            lvi.Text = var.Name.ToString();
+            if (var.Type == null)
+            {
+                MessageBox.Show("error parsing variables..." + var.Name + " has no type");
+                var = null;
+                return;
+            }
+            string typeName = var.Type.Name;
+            if (var.Type.BaseType != null)
+            {
+                // array type etc
+                if (var.Type.Name == "array")
+                {
+                    typeName = var.Type.BaseType.Name + " []";
 
+                }
+                else if (var.Type.Name == "pointer")
+                {
+                    typeName = var.Type.BaseType.Name + " *";
+                }
+            }
+            lvi.SubItems.Add(typeName);
+            lvi.SubItems.Add(var.Address.ToString("X"));
+            lvi.SubItems.Add(var.currentValue);
+            varView.Items.Add(lvi);
+        }
+
+        private Variable ParseLocations(string line, Variable var)
+        {
+            // this is an example list of LocationItems (for a single variable) in the debug file:
+            // 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
+            // 000006b6 000004ca 000004fe (DW_OP_breg28 (r28): 5)
+            // 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
+            // 000006cf 00000508 0000050e (DW_OP_fbreg: -5)
+            // 000006db<End of list>
+
+            if (line.Contains("End of list"))
+            {
+                var = null;
+                return var;
+            }
+
+            if (line.Contains("Offset"))
+            {
+                // just the column header
+                var = null;
+                return var;
+            }
+            UInt32 num;
+            char[] delimiters = new char[] { ' ', ':', ')', '(' };
+            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+            if (var == null)
+            {
+                // this is the first time in this sub-list. Need to find the variabe it refers to.
+                if (UInt32.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out num))
+                {
+                    var = Variables.Find(x => x.Location == num);
+                    if (var == null)
+                    {
+                        // not one of our variables
+                        return null;
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Error in location section: " + line);
+                }
+
+            }
+            
+            LocationItem item = new LocationItem();
+            if (UInt32.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out num))
+            {
+                item.StartAddr = num;
+            }
+            if (UInt32.TryParse(parts[2], System.Globalization.NumberStyles.HexNumber, null, out num))
+            {
+                item.EndAddr = num;
+            }
+            // now the difficult bit
+            if (parts[3].Contains("DW_OP_fbreg"))
+            {
+                // last line in example above: this will be an offset from frame pointer
+                item.Location = parts[4];
+            }
+            else if (parts[3].Contains("DW_OP_bregx"))
+            {
+                // a register. Assuming for now that vales are stored in contiguous addresses
+                item.Location = parts[5];
+            }
+            else if (parts[3].Contains("DW_OP_breg") || parts[3].Contains("DW_OP_reg"))
+            {
+                // first two lines above: register again
+                item.Location = parts[4];
+            }
+            else if (parts[3].Contains("DW_OP_lit") )
+            {
+                // not sure what this means yet...
+                item.Location = parts[3];
+            }
+            else
+            {
+                MessageBox.Show("Unknown location in section: " + line);
+                return null;
+
+            }
+            if (var != null)
+                var.Locations.Add(item);
+            return var;
+
+        }
 
         /// <summary>
         /// Using a line in the disassembly (e.g. C:\Users\chris\Documents\Arduino\qdebugtest/qdebugtest.ino:48)
-        /// find the source lien number at the end
+        /// find the source line number at the end
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>

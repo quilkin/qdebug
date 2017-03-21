@@ -70,7 +70,7 @@
             // baudRateLabel
             // 
             baudRateLabel.AutoSize = true;
-            baudRateLabel.Location = new System.Drawing.Point(6, 46);
+            baudRateLabel.Location = new System.Drawing.Point(20, 46);
             baudRateLabel.Name = "baudRateLabel";
             baudRateLabel.Size = new System.Drawing.Size(61, 13);
             baudRateLabel.TabIndex = 1;
@@ -80,16 +80,16 @@
             // 
             this.baudRateComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "BaudRate", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.baudRateComboBox.FormattingEnabled = true;
-            this.baudRateComboBox.Location = new System.Drawing.Point(94, 48);
+            this.baudRateComboBox.Location = new System.Drawing.Point(91, 46);
             this.baudRateComboBox.Name = "baudRateComboBox";
-            this.baudRateComboBox.Size = new System.Drawing.Size(56, 21);
+            this.baudRateComboBox.Size = new System.Drawing.Size(61, 21);
             this.baudRateComboBox.TabIndex = 2;
             // 
             // portNameComboBox
             // 
             this.portNameComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "PortName", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.portNameComboBox.FormattingEnabled = true;
-            this.portNameComboBox.Location = new System.Drawing.Point(6, 21);
+            this.portNameComboBox.Location = new System.Drawing.Point(13, 19);
             this.portNameComboBox.Name = "portNameComboBox";
             this.portNameComboBox.Size = new System.Drawing.Size(77, 21);
             this.portNameComboBox.TabIndex = 8;
@@ -99,18 +99,17 @@
             this.groupBox1.Controls.Add(this.buttonScan);
             this.groupBox1.Controls.Add(this.baudRateComboBox);
             this.groupBox1.Controls.Add(baudRateLabel);
-            this.groupBox1.Controls.Add(this.btnStop);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Location = new System.Drawing.Point(506, 571);
+            this.groupBox1.Location = new System.Drawing.Point(506, 599);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(158, 104);
+            this.groupBox1.Size = new System.Drawing.Size(158, 76);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Arduino Connection";
             // 
             // buttonScan
             // 
-            this.buttonScan.Location = new System.Drawing.Point(89, 19);
+            this.buttonScan.Location = new System.Drawing.Point(91, 19);
             this.buttonScan.Name = "buttonScan";
             this.buttonScan.Size = new System.Drawing.Size(61, 23);
             this.buttonScan.TabIndex = 17;
@@ -120,11 +119,11 @@
             // 
             // btnStop
             // 
-            this.btnStop.Location = new System.Drawing.Point(8, 73);
+            this.btnStop.Location = new System.Drawing.Point(739, 3);
             this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(144, 23);
+            this.btnStop.Size = new System.Drawing.Size(81, 23);
             this.btnStop.TabIndex = 12;
-            this.btnStop.Text = "Close connection";
+            this.btnStop.Text = "Stop / Close";
             this.btnStop.UseVisualStyleBackColor = true;
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
             // 
@@ -144,19 +143,19 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.commsData.Font = new System.Drawing.Font("Courier New", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.commsData.Location = new System.Drawing.Point(491, 405);
+            this.commsData.Location = new System.Drawing.Point(491, 477);
             this.commsData.Multiline = true;
             this.commsData.Name = "commsData";
             this.commsData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.commsData.Size = new System.Drawing.Size(333, 143);
+            this.commsData.Size = new System.Drawing.Size(333, 116);
             this.commsData.TabIndex = 13;
             this.commsData.Visible = false;
             // 
             // buttonPause
             // 
-            this.buttonPause.Location = new System.Drawing.Point(739, 2);
+            this.buttonPause.Location = new System.Drawing.Point(675, 3);
             this.buttonPause.Name = "buttonPause";
-            this.buttonPause.Size = new System.Drawing.Size(76, 23);
+            this.buttonPause.Size = new System.Drawing.Size(59, 23);
             this.buttonPause.TabIndex = 15;
             this.buttonPause.Text = "Pause";
             this.buttonPause.UseVisualStyleBackColor = true;
@@ -164,9 +163,9 @@
             // 
             // buttonRun
             // 
-            this.buttonRun.Location = new System.Drawing.Point(603, 2);
+            this.buttonRun.Location = new System.Drawing.Point(561, 3);
             this.buttonRun.Name = "buttonRun";
-            this.buttonRun.Size = new System.Drawing.Size(76, 23);
+            this.buttonRun.Size = new System.Drawing.Size(55, 23);
             this.buttonRun.TabIndex = 18;
             this.buttonRun.Text = "Run";
             this.buttonRun.UseVisualStyleBackColor = true;
@@ -174,9 +173,9 @@
             // 
             // buttonStep
             // 
-            this.buttonStep.Location = new System.Drawing.Point(439, 2);
+            this.buttonStep.Location = new System.Drawing.Point(438, 3);
             this.buttonStep.Name = "buttonStep";
-            this.buttonStep.Size = new System.Drawing.Size(76, 23);
+            this.buttonStep.Size = new System.Drawing.Size(49, 23);
             this.buttonStep.TabIndex = 17;
             this.buttonStep.Text = "Step";
             this.buttonStep.UseVisualStyleBackColor = true;
@@ -195,7 +194,7 @@
             this.varView.Location = new System.Drawing.Point(491, 48);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(333, 478);
+            this.varView.Size = new System.Drawing.Size(333, 511);
             this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
@@ -284,7 +283,7 @@
             this.disassemblyView.Location = new System.Drawing.Point(3, 477);
             this.disassemblyView.MultiSelect = false;
             this.disassemblyView.Name = "disassemblyView";
-            this.disassemblyView.Size = new System.Drawing.Size(485, 210);
+            this.disassemblyView.Size = new System.Drawing.Size(485, 209);
             this.disassemblyView.TabIndex = 24;
             this.disassemblyView.UseCompatibleStateImageBehavior = false;
             this.disassemblyView.View = System.Windows.Forms.View.Details;
@@ -302,9 +301,9 @@
             // 
             // buttonStepOver
             // 
-            this.buttonStepOver.Location = new System.Drawing.Point(521, 2);
+            this.buttonStepOver.Location = new System.Drawing.Point(492, 3);
             this.buttonStepOver.Name = "buttonStepOver";
-            this.buttonStepOver.Size = new System.Drawing.Size(76, 23);
+            this.buttonStepOver.Size = new System.Drawing.Size(64, 23);
             this.buttonStepOver.TabIndex = 25;
             this.buttonStepOver.Text = "StepOver";
             this.buttonStepOver.UseVisualStyleBackColor = true;
@@ -312,7 +311,7 @@
             // 
             // buttonComms
             // 
-            this.buttonComms.Location = new System.Drawing.Point(670, 590);
+            this.buttonComms.Location = new System.Drawing.Point(670, 617);
             this.buttonComms.Name = "buttonComms";
             this.buttonComms.Size = new System.Drawing.Size(144, 23);
             this.buttonComms.TabIndex = 26;
@@ -322,7 +321,7 @@
             // 
             // buttonDiss
             // 
-            this.buttonDiss.Location = new System.Drawing.Point(670, 644);
+            this.buttonDiss.Location = new System.Drawing.Point(670, 652);
             this.buttonDiss.Name = "buttonDiss";
             this.buttonDiss.Size = new System.Drawing.Size(144, 23);
             this.buttonDiss.TabIndex = 27;
@@ -335,7 +334,7 @@
             this.panelStopped.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
             this.panelStopped.BackColor = System.Drawing.Color.Red;
             this.panelStopped.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panelStopped.Location = new System.Drawing.Point(685, 2);
+            this.panelStopped.Location = new System.Drawing.Point(621, 4);
             this.panelStopped.Name = "panelStopped";
             this.panelStopped.Size = new System.Drawing.Size(22, 22);
             this.panelStopped.TabIndex = 28;
@@ -345,7 +344,7 @@
             this.panelRunning.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
             this.panelRunning.BackColor = System.Drawing.Color.DarkGreen;
             this.panelRunning.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panelRunning.Location = new System.Drawing.Point(713, 2);
+            this.panelRunning.Location = new System.Drawing.Point(648, 4);
             this.panelRunning.Name = "panelRunning";
             this.panelRunning.Size = new System.Drawing.Size(22, 22);
             this.panelRunning.TabIndex = 29;
@@ -372,6 +371,7 @@
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.buttonReload);
             this.Controls.Add(this.panelRunning);
+            this.Controls.Add(this.btnStop);
             this.Controls.Add(this.panelStopped);
             this.Controls.Add(this.buttonDiss);
             this.Controls.Add(this.buttonComms);
