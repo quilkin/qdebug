@@ -53,16 +53,11 @@ namespace ArdDebug
         // 000006db<End of list>
         public UInt32 StartAddr { get; set; }
         public UInt32 EndAddr  { get; set; }
-        public String Location { get; set; }
+        public String LocationStr { get; set; }
+        public int FrameOffset { get; set; }
     }
     class Variable
     {
-
-    //     <3><1d9a>: Abbrev Number: 39 (DW_TAG_variable)
-    //      <1d9b>   DW_AT_name        : (indirect string, offset: 0x7ef): changeTarget
-    //      <1d9f> DW_AT_decl_file   : 3
-    //      <1da0>   DW_AT_decl_line   : 131
-    //      <1da1>   DW_AT_type        : <0x6da>
         public string Name { get; set; }
         /// <summary>
         /// Name of type (int, float etc)
@@ -85,6 +80,10 @@ namespace ArdDebug
         /// A list of the actual locations of a local variable, found from the location section
         /// </summary>
         public List<LocationItem> Locations;
+        /// <summary>
+        /// The function that this var appears in (if any) : only for local and parameter variables
+        /// </summary>
+        public Function Function { get; set; }
 
         private Arduino arduino;
         private String comString = String.Empty;
@@ -95,13 +94,40 @@ namespace ArdDebug
             Locations = new List<LocationItem>();
         }
 
-        public bool GetValue()
+        public bool GetValue(Function func)
         {
-             UInt16 requestedAddr = 0;
+            UInt16 requestedAddr = 0;
             UInt16 data = 0;
             UInt16 datahi = 0;
             UInt32 bigdata = 0;
             String sendStr;
+
+            // first find location if it's a local variable. This will depend on current program counter
+            if (Function == func && arduino.currentBreakpoint != null)
+            {
+                foreach (LocationItem item in Locations)
+                {
+                    if (item.StartAddr <= arduino.currentBreakpoint.ProgramCounter)
+                    {
+                        if (item.EndAddr > arduino.currentBreakpoint.ProgramCounter)
+                        {
+                            // we are in the right area.
+                            int offset = item.FrameOffset;
+                            if (offset > 0)
+                            {
+                                Address = (ushort)(arduino.currentBreakpoint.FramePointer + offset);
+                            }
+                            else
+                            { //???? not sure yet!
+                                Address = (ushort)(arduino.currentBreakpoint.FramePointer - offset);
+
+                            }
+  
+                        }
+                    }
+
+                }
+            }
 
             requestedAddr = Address;
             sendStr = "A" + requestedAddr.ToString("X4") + "\n";
@@ -188,8 +214,9 @@ namespace ArdDebug
             }
             lvi.SubItems.Add(typeName);
             lvi.SubItems.Add(Address.ToString("X"));
+            //if (Address != 0)
             lvi.SubItems.Add(currentValue);
-            //varView.Items.Add(lvi);
+ 
             return lvi;
         }
         

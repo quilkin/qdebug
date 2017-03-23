@@ -148,7 +148,7 @@ namespace ArdDebug
             bool inLocationSection = false;
             //bool inLocationVariable = false;
 
-            sourceFileRef = 0;
+            SourceFileRef = 0;
 
             // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
 
@@ -173,14 +173,17 @@ namespace ArdDebug
                             // 8 3   0   0   qdebugtest.ino
                             char[] delimiters = new char[] { ' ', '\t' };
                             string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                            int.TryParse(parts[0], out sourceFileRef);
+                            int fileRef = 0;
+                            if (int.TryParse(parts[0], out fileRef)) {
+                                SourceFileRef = fileRef;
+                            }
                             break;
                         }
                     }
                 }
                 ++linecount;
             }
-            if (sourceFileRef== 0)
+            if (SourceFileRef== 0)
             {
                 MessageBox.Show("error parsing debug file, no source file abbr found");
                 return false;
@@ -471,7 +474,8 @@ namespace ArdDebug
             }
 
             // now find the variables themselves. Remove old ones first.
-            // Also find our own functions, so we can get loval variables inside them
+            // Also find our own functions, so we can get local variables inside them
+            //  and libray functions, so we can step over them
             varView.Items.Clear();
             varView.Sorting = SortOrder.None;
             
@@ -527,7 +531,7 @@ namespace ArdDebug
                         string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
                         if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out typeRef))
                         {
-                            VariableType vType  = VariableTypes.Find(x => x.Reference == typeRef);
+                            VariableType vType = VariableTypes.Find(x => x.Reference == typeRef);
                             if (var != null)
                                 var.Type = vType;
                             else if (func != null)
@@ -535,7 +539,7 @@ namespace ArdDebug
                         }
                         else
                         {
-                            MessageBox.Show("error parsing variables..." + line);
+                            MessageBox.Show("error parsing variables..(Type)..." + line);
                         }
                     }
                     else if (line.Contains("DW_AT_decl_file"))
@@ -543,11 +547,11 @@ namespace ArdDebug
                         int index = line.LastIndexOf(':');
                         UInt16 fileRef = 0;
                         string refStr = line.Substring(index + 1);
-                        if (ushort.TryParse(refStr,  out fileRef))
+                        if (ushort.TryParse(refStr, out fileRef))
                         {
                             if (var != null)
                             {
-                                if (fileRef == sourceFileRef)
+                                if (fileRef == SourceFileRef)
                                 {
                                     // this variable is part of our source file
                                 }
@@ -558,14 +562,14 @@ namespace ArdDebug
                             }
                             else if (func != null)
                             {
-                                if (fileRef == sourceFileRef)
+                                if (fileRef == SourceFileRef)
                                 {
                                     // this variable is part of our source file
                                     func.fileRef = fileRef;
                                 }
                                 else
                                 {
-                                    func= null;  // ignore and get ready for next one
+                                    //func= null;  // ignore and get ready for next one
                                 }
 
                             }
@@ -573,7 +577,7 @@ namespace ArdDebug
                         }
                         else
                         {
-                            MessageBox.Show("error parsing variables..." + line);
+                            MessageBox.Show("error parsing variables...(file).." + line);
                         }
                     }
                     else if (line.Contains("DW_AT_artificial") && func != null)
@@ -583,10 +587,13 @@ namespace ArdDebug
                     }
                     else if (line.Contains("DW_AT_location") && var != null)
                     {
+                        if (line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
+                            continue;
                         int index1, index2;
                         string refStr;
-                        if (line.Contains("location list") || line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
+                        if (line.Contains("location list"))
                         {
+                       
                             // local or register var
                             if (func == null || func.Name == null)
                             {
@@ -597,7 +604,7 @@ namespace ArdDebug
                             else if (line.Contains("location list"))
                             {
                                 // This is in a function. First need to mofify the param name with the function name
-                               // var.Name = func.Name + "." + var.Name;
+                                // var.Name = func.Name + "." + var.Name;
                                 // start to find location of local variable or formal parameter
                                 //   < 14f7 > DW_AT_location    : 0x656(location list)
                                 index1 = line.LastIndexOf(':');
@@ -609,8 +616,13 @@ namespace ArdDebug
                                 if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out location))
                                 {
                                     var.Location = location;
+                                    var.Function = func;
                                     Variables.Add(var);
-                                    varView.Items.Add(var.CreateVarViewItem());
+                                    // associate with function so we can update locals only when stepping through function
+                                    func.LocalVars.Add(var);
+                                    ListViewItem item = var.CreateVarViewItem();
+                                    if (item != null)
+                                        varView.Items.Add(var.CreateVarViewItem());
                                     continue;
                                 }
                                 else
@@ -633,58 +645,62 @@ namespace ArdDebug
                             var.Address = (ushort)(loc & 0xFFFF);
                             Variables.Add(var);
                             ListViewItem lvi = var.CreateVarViewItem();
-                            //ListViewItem lvi = new ListViewItem();
-                            //lvi.Name = var.Name.ToString();
-                            //lvi.Text = var.Name.ToString();
-                            //if (var.Type == null)
-                            //{
-                            //    MessageBox.Show("error parsing variables..." + var.Name + " has no type");
-                            //    var = null;
-                            //    continue;
-                            //}
-                            //string typeName = var.Type.Name;
-                            //if (var.Type.BaseType != null)
-                            //{
-                            //    // array type etc
-                            //    if (var.Type.Name == "array")
-                            //    {
-                            //        typeName = var.Type.BaseType.Name + " []";
 
-                            //    }
-                            //    else if (var.Type.Name == "pointer")
-                            //    {
-                            //        typeName = var.Type.BaseType.Name + " *";
-                            //    }
-                            //}
-                            //lvi.SubItems.Add(typeName);
-                            //lvi.SubItems.Add(var.Address.ToString("X"));
-                            //lvi.SubItems.Add(var.currentValue);
                             varView.Items.Add(lvi);
                             var = null;  // get ready for next one
                         }
                         else
                         {
-                            MessageBox.Show("error parsing variables..." + line);
+                            MessageBox.Show("error parsing variables..(location)..."  + line);
                         }
                     }
-                    else if ((line.Contains("DW_TAG_subprogram") || line.Contains("DW_TAG_GNU_call_site")) && func != null)
+                    else if (line.Contains("DW_AT_low_pc") && func != null)
                     {
-                        // done with this func, onto the next.
-                        if (func.Name != null && func.Name.Length > 0)
-                        {
-                            Functions.Add(func);
+                        int colon = line.LastIndexOf(": 0x");
+                        UInt16 loc = 0;
+                        string refStr = line.Substring(colon+4);
+                        if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            func.LowPC = loc;
+                    }
+                    else if (line.Contains("DW_AT_high_pc") && func != null)
+                    {
+                        int colon = line.LastIndexOf(": 0x");
+                        UInt16 loc = 0;
+                        string refStr = line.Substring(colon + 4);
+                        if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            func.HighPC = loc;
+                    }
+                    else if (line.Contains("DW_TAG_subprogram") || line.Contains("DW_TAG_GNU_call_site") || line.Contains("DW_TAG_inlined_subroutine"))
+                    {
+                        if (func != null) { 
+                            // done with this func, onto the next.
+                            if (func.Name != null && func.Name.Length > 0)
+                            {
+                                Functions.Add(func);
+                            }
+                            func = null;
                         }
-                        func = null;
+                        if (var != null)
+                        {
+                            var = null;
+                        }
                     }
                 }
-                if (line.Contains("DW_TAG_variable") || line.Contains("DW_TAG_formal_parameter"))
+                if (line.Contains("DW_TAG_variable"))
                 {
                     var = new Variable(this);
-   
+                }
+                else if (line.Contains("DW_TAG_formal_parameter"))
+                {
+                    if (func == null)
+                        continue;
+                    if (func.IsMine == false)
+                        continue;
+                    var = new Variable(this);
                 }
                 else if (line.Contains("DW_TAG_subprogram"))
                 {
-                    func = new Function();
+                    func = new Function(this);
                 }
                 else if (line.Contains(".debug_loc"))
                 {
@@ -741,7 +757,6 @@ namespace ArdDebug
                 var = null;
                 return var;
             }
-
             if (line.Contains("Offset"))
             {
                 // just the column header
@@ -749,11 +764,11 @@ namespace ArdDebug
                 return var;
             }
             UInt32 num;
-            char[] delimiters = new char[] { ' ', ':', ')', '(' };
+            char[] delimiters = new char[] { ' ', ':', ')', '(' , ';'};
             string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
             if (var == null)
             {
-                // this is the first time in this sub-list. Need to find the variabe it refers to.
+                // this is the first time in this sub-list. Need to find the variable it refers to.
                 if (UInt32.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out num))
                 {
                     var = Variables.Find(x => x.Location == num);
@@ -767,9 +782,7 @@ namespace ArdDebug
                 {
                     MessageBox.Show("Error in location section: " + line);
                 }
-
             }
-            
             LocationItem item = new LocationItem();
             if (UInt32.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out num))
             {
@@ -782,23 +795,37 @@ namespace ArdDebug
             // now the difficult bit
             if (parts[3].Contains("DW_OP_fbreg"))
             {
-                // last line in example above: this will be an offset from frame pointer
-                item.Location = parts[4];
+                // e.g  000006cf 00000508 0000050e (DW_OP_fbreg: -5)
+                // an offset from frame pointer
+                item.LocationStr = parts[4];
             }
             else if (parts[3].Contains("DW_OP_bregx"))
             {
-                // a register. Assuming for now that vales are stored in contiguous addresses
-                item.Location = parts[5];
+                // e.g. 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
+                // offset from X-regsiter (which is R26/27 - why does it list R32 (which doesn't exist??)
+                item.LocationStr = parts[5] + ',' + parts[6];
             }
-            else if (parts[3].Contains("DW_OP_breg") || parts[3].Contains("DW_OP_reg"))
+            else if (parts[3].Contains("DW_OP_breg"))
             {
-                // first two lines above: register again
-                item.Location = parts[4];
+                // e.g. 000006b6 000004ca 000004fe (DW_OP_breg28 (r28): 5)
+                // offset from a register
+                item.LocationStr = parts[4] +',' + parts[5];
             }
-            else if (parts[3].Contains("DW_OP_lit") )
+            else if (parts[3].Contains("DW_OP_reg"))
+            {
+                // e.g. 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
+                // directly in register
+                item.LocationStr = parts[4];
+            }
+            else if (parts[3].Contains("DW_OP_lit"))
             {
                 // not sure what this means yet...
-                item.Location = parts[3];
+                item.LocationStr = parts[3];
+            }
+            else if (parts[3].Contains("DW_OP_GNU"))
+            {
+                // not sure what this means yet...
+                item.LocationStr = parts[3];
             }
             else
             {
@@ -807,7 +834,44 @@ namespace ArdDebug
 
             }
             if (var != null)
+            {
+                int reg = 0;
+                int offset = 0;
+                if (item.LocationStr.StartsWith("r"))
+                {
+                    
+                    // register location, r18-31: these will have been saved on the stack too
+                    item.LocationStr = item.LocationStr.Substring(1);
+                    if (int.TryParse(item.LocationStr, out reg))
+                    {
+                        int comma = item.LocationStr.IndexOf(',');
+                        if (comma > 0)
+                        {
+                            // this is an offset from a  reg, not the reg itself....
+                            if (int.TryParse(item.LocationStr.Substring(comma + 1), out offset))
+                            {
+                                item.FrameOffset = offset;
+                            }
+                        }
+                        else
+                        {
+                            // see 'analog_int.s' to find/calculate this offset
+                            item.FrameOffset = reg - 17;
+                        }
+                 
+                    }
+                }
+                else
+                {
+                    // not a regsiter, just a direct offset number
+                    if (int.TryParse(item.LocationStr, out offset))
+                    {
+                        item.FrameOffset = offset;
+                     }
+
+                }
                 var.Locations.Add(item);
+            }
             return var;
 
         }

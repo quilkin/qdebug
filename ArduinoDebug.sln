@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArduinoDebug", "SerialPortL
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "qdebugtest", "..\..\..\Arduino\qdebugtest\qdebugtest.vcxproj", "{388DE1CE-F676-41DE-A134-05B6BC5038F1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sketch_mar19a", "..\..\..\Arduino\sketch_mar19a\sketch_mar19a.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -23,10 +21,6 @@ Global
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x86.Build.0 = Debug|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.ActiveCfg = Release|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.Build.0 = Release|Win32
-		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.ActiveCfg = Debug|Win32
-		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
-		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
-		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

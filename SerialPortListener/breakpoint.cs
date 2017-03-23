@@ -10,6 +10,7 @@ namespace ArdDebug
     {
 
         public ushort ProgramCounter   { get; set; }
+        public ushort FramePointer      { get; set; }
         public UInt32 OpCode           { get; set; }
         public string Assembler        { get; set; }
         /// <summary>

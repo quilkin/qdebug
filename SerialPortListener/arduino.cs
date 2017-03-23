@@ -33,7 +33,7 @@ namespace ArdDebug
         /// <summary>
         /// where program counter is currently sitting
         /// </summary>
-        private Breakpoint currentBreakpoint = null;
+        public Breakpoint currentBreakpoint { private set; get; }
         /// <summary>
         /// next place to stop if we skip over a function call
         /// </summary>
@@ -43,7 +43,7 @@ namespace ArdDebug
         /// <summary>
         /// source file reference from .elf file
         /// </summary>
-        private int sourceFileRef;
+        public int SourceFileRef { private set; get; }
 
         Serial.SerialPortManager spmanager;
 
@@ -105,35 +105,45 @@ namespace ArdDebug
             varView.Enabled = true;
         }
 
-        public enum FunctionType : byte { None, Mine, Other };
 
+        delegate Function FindFuncDelegate();
         /// <summary>
         /// See if this line calls a  function; if so is it one of ours?
         /// </summary>
         /// <returns></returns>
-        FunctionType FindFunctionWithinLine()
+        Function FindFunctionWithinLine()
         {
-            if (currentBreakpoint != null)
+            if (source.InvokeRequired)
             {
- 
-                int line = currentBreakpoint.SourceLine;
-                ListViewItem sourceItem = source.Items[line - 1];
-                string sourceLine = sourceItem.SubItems[2].Text;
-                FunctionType fType = FunctionType.None;
-                foreach (Function func in Functions)
-                {
-                    if (sourceLine.Contains(func.Name))
-                    {
-                        fType = FunctionType.Other;
-                        if (func.fileRef == sourceFileRef)
-                            fType = FunctionType.Mine;
-                        break;
-                    }
-                }
-                return fType;
-
+                FindFuncDelegate d = new FindFuncDelegate(FindFunctionWithinLine);
+                varView.Invoke(d, new object[] {  });
             }
-            return FunctionType.None;
+            else
+            {
+                if (currentBreakpoint != null)
+                {
+
+                    int line = currentBreakpoint.SourceLine;
+                    ListViewItem sourceItem = source.Items[line - 1];
+                    string sourceLine = sourceItem.SubItems[2].Text;
+                    //FunctionType fType = FunctionType.None;
+                    foreach (Function func in Functions)
+                    {
+                        if (sourceLine.Contains(func.Name))
+                        {
+                            //if (func.fileRef == SourceFileRef)
+                            //    func.Owner = Function.FunctionOwner.Mine;
+                            //else
+                            //    func.Owner = Function.FunctionOwner.Other;
+                            return func;
+                        }
+                    }
+                    return null;
+
+                }
+                return null;
+            }
+            return null;
         }
 
         delegate void SingleStepDelegate(bool funcChecked);
@@ -151,12 +161,16 @@ namespace ArdDebug
                 {
                     if (!funcChecked)
                     {
-                        FunctionType fType = FindFunctionWithinLine();
-                        if (fType == FunctionType.Other)
+                        Function func = FindFunctionWithinLine();
+                        if (func != null)
                         {
-                            // if so, step over rather than into it.
-                            StepOver(true);
-                            return;
+                            //if (func.Owner == Function.FunctionOwner.Other)
+                            if (func.IsMine == false)
+                            {
+                                // if so, step over rather than into it.
+                                StepOver(true);
+                                return;
+                            }
                         }
                     }
 
@@ -206,7 +220,7 @@ namespace ArdDebug
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Sorry there has been a problem");
+                    MessageBox.Show(ex.ToString(), "Sorry there has been a problem. (A)");
                 }
 
             }
@@ -220,11 +234,16 @@ namespace ArdDebug
         {
             if (!funcChecked)
             {
-                FunctionType fType = FindFunctionWithinLine();
-                if (fType == FunctionType.None)
+                Function func = FindFunctionWithinLine();
+                if (func != null)
                 {
-                    SingleStep(true);
-                    return;
+                    // asking to step over but there's no function here, so single step instead
+                    //if (func.Owner == Function.FunctionOwner.None)
+                    //if (func.IsMine )
+                    //{
+                        SingleStep(true);
+                        return;
+                    //}
                 }
             }
 
@@ -310,7 +329,7 @@ namespace ArdDebug
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Sorry there has been a problem");
+                MessageBox.Show(ex.ToString(), "Sorry there has been a problem (B)");
             }
         }
         
@@ -318,12 +337,53 @@ namespace ArdDebug
 
         public void GetVariables()
         {
+
+            //// first see if we need to also get local variables
+            Function func = null;
+            if (currentBreakpoint != null)
+            {
+                UInt16 progCounter = currentBreakpoint.ProgramCounter;
+                
+                foreach (Function f in Functions)
+                {
+                    if (f.IsMine)
+                    {
+                        if (f.HighPC > progCounter && f.LowPC <= progCounter)
+                        {
+                            // we are currently 'in' this function
+                            func = f;
+                            break;
+                        }
+                    }
+
+                }
+            }
+
             String sendStr = "PFFFF\n";  // todo: can get rid of this command to save time & code space
             Send(sendStr);
-            System.Threading.Thread.Sleep(100);
+            //System.Threading.Thread.Sleep(100);
+
+            // get current frame pointer, needed for local variables
+            comString = ReadLine();
+            if (comString.Length > 4 && comString[0]=='F' && currentBreakpoint != null)
+            {
+                ushort fpointer;
+                if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out fpointer))
+                {
+                    currentBreakpoint.FramePointer = fpointer;
+                }
+            }
             foreach (Variable var in Variables)
             {
-                 if (var.GetValue() == false)
+                if (func != null)
+                {
+                    if (var.Function != func)
+                    {
+                        // We are not in the same function where this variable is used
+                        continue;
+                    }
+                }
+                if (var.GetValue(func) == false)
                 {
                     break;
                 }
@@ -389,7 +449,7 @@ namespace ArdDebug
                         // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
                         Variables.Add(indirect);
                         // ask the device for the value of the indirected variable
-                        indirect.GetValue();
+                        indirect.GetValue(null);
 
                         // create a new row and display it
                         string[] items = { "  " + indirect.Name, var.Type.BaseType.Name, "0x" + indAddr.ToString("X4"), indirect.currentValue };
@@ -415,7 +475,7 @@ namespace ArdDebug
                             // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
                             Variables.Add(arrayElement);
 
-                            arrayElement.GetValue();
+                            arrayElement.GetValue(null);
 
                             // create a new row and display it
                             string[] items = { "  " + arrayElement.Name, var.Type.BaseType.Name, addr.ToString("X4"), arrayElement.currentValue };
@@ -461,7 +521,7 @@ namespace ArdDebug
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Sorry there has been a problem");
+                MessageBox.Show(ex.ToString(), "Sorry there has been a problem (C)");
             }
         }
 
@@ -499,55 +559,61 @@ namespace ArdDebug
                     if (lvis == null || lvis.Length == 0)
                         continue;
                     ListViewItem lvi = lvis[0];
-                                   
-                    lvi.SubItems[2].Text = "0x" + var.Address.ToString("X4");
-                    if (var.Type.BaseType == null)
+
+                    if (var.Address != 0)
                     {
-                        lvi.SubItems[3].Text = var.currentValue;
-                    }
-                    else if (var.Type.Name == "array")
-                    {
-                        lvi.SubItems[3].Text = "....";
-                    }
-                    else if (var.Type.Name == "pointer")
-                    {
-                        // show address pointed to (in hex)
-                        int addr=-1;
-                        int.TryParse(var.currentValue, out addr);
-                        if (addr >= 0)
+                        lvi.SubItems[2].Text = "0x" + var.Address.ToString("X4");
+                        if (var.Type.BaseType == null)
                         {
-                            lvi.SubItems[3].Text = "0x" + addr.ToString("X4");
+                            lvi.SubItems[3].Text = var.currentValue;
                         }
-            
-                    }
-                    if (var.currentValue != var.lastValue)
-                    {
-                        lvi.ForeColor = System.Drawing.Color.Red;
-                        // if this is a pointer, and it has changed, 
-                        //   we need to also find a new value for the value pointed to, if it's currently displayed
-                        if (var.Type.Name == "pointer")
+                        else if (var.Type.Name == "array")
                         {
-                            // get the indirected value of this pointer
-                            ushort indAddr = 0;
-                            if (ushort.TryParse(var.currentValue, out indAddr))
+                            lvi.SubItems[3].Text = "....";
+                        }
+                        else if (var.Type.Name == "pointer")
+                        {
+                            // show address pointed to (in hex)
+                            int addr = -1;
+                            int.TryParse(var.currentValue, out addr);
+                            if (addr >= 0)
                             {
-                                // if it's currently displayed it will be in the list
-                                var indirect = Variables.Find(x => x.Name == "*" + var.Name);
-                                if (indirect != null)
-                                {
-                                    indirect.Address = indAddr;
-                                    indirect.GetValue();
-                                }
-                             }
+                                lvi.SubItems[3].Text = "0x" + addr.ToString("X4");
+                            }
+
                         }
+                        if (var.currentValue != var.lastValue)
+                        {
+                            lvi.ForeColor = System.Drawing.Color.Red;
+                            // if this is a pointer, and it has changed, 
+                            //   we need to also find a new value for the value pointed to, if it's currently displayed
+                            if (var.Type.Name == "pointer")
+                            {
+                                // get the indirected value of this pointer
+                                ushort indAddr = 0;
+                                if (ushort.TryParse(var.currentValue, out indAddr))
+                                {
+                                    // if it's currently displayed it will be in the list
+                                    var indirect = Variables.Find(x => x.Name == "*" + var.Name);
+                                    if (indirect != null)
+                                    {
+                                        indirect.Address = indAddr;
+                                        indirect.GetValue(null);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            lvi.ForeColor = System.Drawing.Color.Black;
+                        }
+                        var.lastValue = var.currentValue;
                     }
                     else
                     {
-                        lvi.ForeColor = System.Drawing.Color.Black;
+                        //lvi.Text = "  " + lvi.Text;
+                        lvi.BackColor = System.Drawing.Color.Beige;
                     }
-                    var.lastValue = var.currentValue;
-
-
                 }
             }
         }

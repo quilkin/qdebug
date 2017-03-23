@@ -216,7 +216,14 @@ namespace ArdDebug.Serial
             _serialPort.ReadTimeout = 1000;
             // Subscribe to event and open serial port for data
             //_serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
-            _serialPort.Open();
+            try
+            {
+                _serialPort.Open();
+            }
+            catch
+            {
+                MessageBox.Show("No device found, please check ports");
+            }
         }
 
         /// <summary>

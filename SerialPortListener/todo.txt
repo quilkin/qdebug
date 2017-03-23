@@ -12,3 +12,5 @@ ensure latest version loaded
 //check for use of portd7
 
 catch exceptions
+
+non-UI copies of source & debug lines, to void use of cross-thread delegates?
