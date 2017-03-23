@@ -587,8 +587,35 @@ namespace ArdDebug
                     }
                     else if (line.Contains("DW_AT_location") && var != null)
                     {
-                        if (line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_stack_value"))
+                        if (line.Contains("DW_OP_stack_value"))
                             continue;
+
+                        // local or register var?
+                        if (func == null || func.Name == null)
+                            continue;
+
+                        if (line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_fbreg"))
+                        {
+                            // e.g.   <2474>   DW_AT_location    : 6 byte block: 64 93 1 65 93 1 	(DW_OP_reg20 (r20); DW_OP_piece: 1; DW_OP_reg21 (r21); DW_OP_piece: 1)
+                            int bracket = line.IndexOf('(');
+                            if (bracket < 0)
+                            {
+                                MessageBox.Show("error parsing variables...(location).." + line);
+                            }
+                            LocationItem item = new LocationItem();
+                            // any address valid
+                            item.StartAddr = 0x00000000;
+                            item.EndAddr = 0xFFFFFFFF;
+                            ParseRegisterString(var, item, line.Substring(bracket));
+                            var.Function = func;
+                            Variables.Add(var);
+                            // associate with function so we can update locals only when stepping through function
+                            func.LocalVars.Add(var);
+                            varView.Items.Add(var.CreateVarViewItem());
+                            var = null;
+                            continue;
+                        }
+
                         int index1, index2;
                         string refStr;
                         if (line.Contains("location list"))
@@ -742,7 +769,93 @@ namespace ArdDebug
             lvi.SubItems.Add(var.currentValue);
             varView.Items.Add(lvi);
         }
+        
+        private void ParseRegisterString(Variable var, LocationItem item, string toParse)
+        {
+            char[] delimiters = new char[] { ' ', ':', ')', '(' , ';'};
+            string[] parts = toParse.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+            if (parts[0].Contains("DW_OP_fbreg"))
+            {
+                // e.g  (DW_OP_fbreg: -5)
+                // an offset from frame pointer
+                item.LocationStr = parts[1];
+            }
+            else if (parts[0].Contains("DW_OP_bregx"))
+            {
+                // e.g.  (DW_OP_bregx: 32 (r32) 5)
+                // offset from X-regsiter (which is R26/27 - why does it list R32 (which doesn't exist??)
+                item.LocationStr = parts[2] + ',' + parts[3];
+            }
+            else if (parts[0].Contains("DW_OP_breg"))
+            {
+                // e.g.  (DW_OP_breg28 (r28): 5)
+                // offset from a register
+                item.LocationStr = parts[1] + ',' + parts[2];
+            }
+            else if (parts[0].Contains("DW_OP_reg"))
+            {
+                // e.g. (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
+                // directly in register
+                item.LocationStr = parts[1];
+            }
+            else if (parts[0].Contains("DW_OP_lit"))
+            {
+                // not sure what this means yet...
+                item.LocationStr = parts[0];
+            }
+            else if (parts[0].Contains("DW_OP_GNU"))
+            {
+                // not sure what this means yet...
+                item.LocationStr = parts[0];
+            }
+            else
+            {
+                MessageBox.Show("Unknown location in section: " + toParse);
+                return ;
 
+            }
+            if (var != null)
+            {
+                int reg = 0;
+                int offset = 0;
+                parts = item.LocationStr.Split(',');
+                if (parts[0].StartsWith("r"))
+                {
+                    // register location, r18-31: these will have been saved on the stack too
+                    parts[0] = parts[0].Substring(1);
+                    if (int.TryParse(parts[0], out reg))
+                    {
+                        // see 'analog_int.s' to find/calculate this offset
+                        item.FrameOffset = reg - 17;
+
+                        if (parts.Length > 1)
+                        {
+                            // this is an offset from a  reg, not the reg itself....
+                            if (int.TryParse(parts[1], out offset))
+                            {
+                                item.RegisterOffset = offset;
+                            }
+
+                        }
+                        else
+                        {
+                            item.RegisterOffset = 9999; // special value indicating that register value is direct
+                        }
+
+                    }
+                }
+                else
+                {
+                    // not a regsiter, just a direct offset number
+                    if (int.TryParse(item.LocationStr, out offset))
+                    {
+                        item.FrameOffset = offset;
+                    }
+
+                }
+                var.Locations.Add(item);
+            }
+        }
         private Variable ParseLocations(string line, Variable var)
         {
             // this is an example list of LocationItems (for a single variable) in the debug file:
@@ -764,7 +877,7 @@ namespace ArdDebug
                 return var;
             }
             UInt32 num;
-            char[] delimiters = new char[] { ' ', ':', ')', '(' , ';'};
+            char[] delimiters = new char[] { ' '};
             string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
             if (var == null)
             {
@@ -792,86 +905,95 @@ namespace ArdDebug
             {
                 item.EndAddr = num;
             }
-            // now the difficult bit
-            if (parts[3].Contains("DW_OP_fbreg"))
+            int bracket = line.IndexOf('(');
+            if (bracket < 0)
             {
-                // e.g  000006cf 00000508 0000050e (DW_OP_fbreg: -5)
-                // an offset from frame pointer
-                item.LocationStr = parts[4];
+                MessageBox.Show("error parsing variables...(location).." + line);
             }
-            else if (parts[3].Contains("DW_OP_bregx"))
-            {
-                // e.g. 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
-                // offset from X-regsiter (which is R26/27 - why does it list R32 (which doesn't exist??)
-                item.LocationStr = parts[5] + ',' + parts[6];
-            }
-            else if (parts[3].Contains("DW_OP_breg"))
-            {
-                // e.g. 000006b6 000004ca 000004fe (DW_OP_breg28 (r28): 5)
-                // offset from a register
-                item.LocationStr = parts[4] +',' + parts[5];
-            }
-            else if (parts[3].Contains("DW_OP_reg"))
-            {
-                // e.g. 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
-                // directly in register
-                item.LocationStr = parts[4];
-            }
-            else if (parts[3].Contains("DW_OP_lit"))
-            {
-                // not sure what this means yet...
-                item.LocationStr = parts[3];
-            }
-            else if (parts[3].Contains("DW_OP_GNU"))
-            {
-                // not sure what this means yet...
-                item.LocationStr = parts[3];
-            }
-            else
-            {
-                MessageBox.Show("Unknown location in section: " + line);
-                return null;
+            ParseRegisterString(var, item, line.Substring(bracket));
 
-            }
-            if (var != null)
-            {
-                int reg = 0;
-                int offset = 0;
-                if (item.LocationStr.StartsWith("r"))
-                {
-                    
-                    // register location, r18-31: these will have been saved on the stack too
-                    item.LocationStr = item.LocationStr.Substring(1);
-                    if (int.TryParse(item.LocationStr, out reg))
-                    {
-                        int comma = item.LocationStr.IndexOf(',');
-                        if (comma > 0)
-                        {
-                            // this is an offset from a  reg, not the reg itself....
-                            if (int.TryParse(item.LocationStr.Substring(comma + 1), out offset))
-                            {
-                                item.FrameOffset = offset;
-                            }
-                        }
-                        else
-                        {
-                            // see 'analog_int.s' to find/calculate this offset
-                            item.FrameOffset = reg - 17;
-                        }
-                 
-                    }
-                }
-                else
-                {
-                    // not a regsiter, just a direct offset number
-                    if (int.TryParse(item.LocationStr, out offset))
-                    {
-                        item.FrameOffset = offset;
-                     }
 
-                }
-                var.Locations.Add(item);
-            }
+            //if (parts[3].Contains("DW_OP_fbreg"))
+            //{
+            //    // e.g  000006cf 00000508 0000050e (DW_OP_fbreg: -5)
+            //    // an offset from frame pointer
+            //    item.LocationStr = parts[4];
+            //}
+            //else if (parts[3].Contains("DW_OP_bregx"))
+            //{
+            //    // e.g. 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
+            //    // offset from X-regsiter (which is R26/27 - why does it list R32 (which doesn't exist??)
+            //    item.LocationStr = parts[5] + ',' + parts[6];
+            //}
+            //else if (parts[3].Contains("DW_OP_breg"))
+            //{
+            //    // e.g. 000006b6 000004ca 000004fe (DW_OP_breg28 (r28): 5)
+            //    // offset from a register
+            //    item.LocationStr = parts[4] +',' + parts[5];
+            //}
+            //else if (parts[3].Contains("DW_OP_reg"))
+            //{
+            //    // e.g. 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
+            //    // directly in register
+            //    item.LocationStr = parts[4];
+            //}
+            //else if (parts[3].Contains("DW_OP_lit"))
+            //{
+            //    // not sure what this means yet...
+            //    item.LocationStr = parts[3];
+            //}
+            //else if (parts[3].Contains("DW_OP_GNU"))
+            //{
+            //    // not sure what this means yet...
+            //    item.LocationStr = parts[3];
+            //}
+            //else
+            //{
+            //    MessageBox.Show("Unknown location in section: " + line);
+            //    return null;
+
+            //}
+            //if (var != null)
+            //{
+            //    int reg = 0;
+            //    int offset = 0;
+            //    parts = item.LocationStr.Split(',');
+            //    if (parts[0].StartsWith("r"))
+            //    {
+            //        // register location, r18-31: these will have been saved on the stack too
+            //        parts[0] = parts[0].Substring(1);
+            //        if (int.TryParse(parts[0], out reg))
+            //        {
+            //            // see 'analog_int.s' to find/calculate this offset
+            //            item.FrameOffset = reg - 17;
+
+            //            if (parts.Length > 1)
+            //            {
+            //                // this is an offset from a  reg, not the reg itself....
+            //                if (int.TryParse(parts[1], out offset))
+            //                {
+            //                    item.RegisterOffset = offset;
+            //                }
+
+            //            }
+            //            else
+            //            {
+            //                item.RegisterOffset = 9999; // special value indicating that register value is direct
+            //            }
+
+            //        }
+            //    }
+            //    else
+            //    {
+            //        // not a regsiter, just a direct offset number
+            //        if (int.TryParse(item.LocationStr, out offset))
+            //        {
+            //            item.FrameOffset = offset;
+            //         }
+
+            //    }
+            //    var.Locations.Add(item);
+            //}
             return var;
 
         }

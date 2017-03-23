@@ -14,3 +14,5 @@ ensure latest version loaded
 catch exceptions
 
 non-UI copies of source & debug lines, to void use of cross-thread delegates?
+
+save com port between sesssions

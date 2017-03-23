@@ -54,7 +54,14 @@ namespace ArdDebug
         public UInt32 StartAddr { get; set; }
         public UInt32 EndAddr  { get; set; }
         public String LocationStr { get; set; }
+        /// <summary>
+        /// Variable is stored at an offset from the frame pointer
+        /// </summary>
         public int FrameOffset { get; set; }
+        /// <summary>
+        /// Vraible is stored at an offset from a register (X,Y,Z)
+        /// </summary>
+        public int RegisterOffset { get; set; }
     }
     class Variable
     {
@@ -94,13 +101,37 @@ namespace ArdDebug
             Locations = new List<LocationItem>();
         }
 
+        private bool GetData(UInt16 address, out UInt16 data)
+        {
+            String sendStr;
+            data = 0;
+            sendStr = "A" + address.ToString("X4") + "\n";
+            arduino.Send(sendStr);
+            comString = arduino.ReadLine();
+
+            if (comString.Length < 5)
+                return false;
+            if (comString.StartsWith("D")==false)
+            {
+                return false;
+            }
+            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
+            {
+                return true;
+            }
+            return false;
+        }
+
         public bool GetValue(Function func)
         {
-            UInt16 requestedAddr = 0;
+            //UInt16 requestedAddr = 0;
             UInt16 data = 0;
             UInt16 datahi = 0;
             UInt32 bigdata = 0;
-            String sendStr;
+            //String sendStr;
+
+            if (Type == null)
+                return false;
 
             // first find location if it's a local variable. This will depend on current program counter
             if (Function == func && arduino.currentBreakpoint != null)
@@ -112,35 +143,41 @@ namespace ArdDebug
                         if (item.EndAddr > arduino.currentBreakpoint.ProgramCounter)
                         {
                             // we are in the right area.
-                            int offset = item.FrameOffset;
-                            if (offset > 0)
+                            // Is this variable stored directly in a register (now at a fixed offset from frame),
+                            //   or offset from that register?
+                            if (item.RegisterOffset == 9999)
                             {
-                                Address = (ushort)(arduino.currentBreakpoint.FramePointer + offset);
+                                // direct 
+                                int offset = item.FrameOffset;
+                                if (offset > 0)
+                                {
+                                    Address = (ushort)(arduino.currentBreakpoint.FramePointer + offset);
+                                }
+                                else
+                                { //???? not sure yet!
+                                    Address = (ushort)(arduino.currentBreakpoint.FramePointer - offset);
+                                }
                             }
                             else
-                            { //???? not sure yet!
-                                Address = (ushort)(arduino.currentBreakpoint.FramePointer - offset);
-
+                            {
+                                // address of register (pushed on stack)
+                                Address = (ushort)(arduino.currentBreakpoint.FramePointer + item.FrameOffset);
+                                // get indirected address by asking for it
+                                if (GetData((ushort)(Address ), out data))
+                                {
+                                    Address = (ushort)(data + item.RegisterOffset);
+                                }
+                                else
+                                    return false;
                             }
-  
                         }
                     }
-
                 }
             }
-
-            requestedAddr = Address;
-            sendStr = "A" + requestedAddr.ToString("X4") + "\n";
-            arduino.Send(sendStr);
-            comString = arduino.ReadLine();
-
-            if (comString.Length < 5)
-                return false;
-            if (Type == null)
-                return false;
             lastValue = currentValue;
-            if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out data))
-            {
+
+            if (GetData(Address,out data))
+            { 
                 if (Type.Size == 1)
                 {
                     // our data has two bytes; we just want the 'lowest' one
@@ -162,14 +199,8 @@ namespace ArdDebug
                     if (Type.Size == 4)
                     {
                         // need to get the next two bytes
-                        requestedAddr += 2;
-                        sendStr = "A" + requestedAddr.ToString("X4") + "\n";
-                        arduino.Send(sendStr);
-                        comString = arduino.ReadLine();
-                        if (comString.Length < 5)
-                            return false;
-                        if (ushort.TryParse(comString.Substring(1, 4), System.Globalization.NumberStyles.HexNumber, null, out datahi))
-                        {
+                        if (GetData((ushort)(Address+2),out datahi))
+                        { 
                             bigdata = (UInt32)(datahi << 16) + data;
                             currentValue = bigdata.ToString();
                             if (Type.Name == "float")
