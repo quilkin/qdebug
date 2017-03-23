@@ -583,16 +583,45 @@ namespace ArdDebug
                     else if (line.Contains("DW_AT_artificial") && func != null)
                     {
                         func = null;  // ignore and get ready for next one
-
+                        var = null;
                     }
+                    else if (line.Contains("DW_AT_abstract_origin") && var != null)
+                    {
+                        var = null;  // ignore and get ready for next one
+                        continue;
+                    }
+                    
                     else if (line.Contains("DW_AT_location") && var != null)
                     {
                         if (line.Contains("DW_OP_stack_value"))
                             continue;
-
+                        int index1, index2;
+                        string refStr;
                         // local or register var?
                         if (func == null || func.Name == null)
+                        {
+                            index1 = line.LastIndexOf(':');
+                            index2 = line.LastIndexOf(')');
+                            if (index1 < 0 || index2 < 0)
+                                continue;
+                            UInt32 loc = 0;
+                            refStr = line.Substring(index1 + 1, index2 - index1 - 1);
+                            if (uint.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            {
+                                var.Address = (ushort)(loc & 0xFFFF);
+                                Variables.Add(var);
+                                ListViewItem lvi = var.CreateVarViewItem();
+
+                                varView.Items.Add(lvi);
+                                var = null;  // get ready for next one
+                            }
+                            else
+                            {
+                                MessageBox.Show("error parsing variables..(location)..." + line);
+                            }
                             continue;
+                        }
+
 
                         if (line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_fbreg"))
                         {
@@ -616,8 +645,7 @@ namespace ArdDebug
                             continue;
                         }
 
-                        int index1, index2;
-                        string refStr;
+
                         if (line.Contains("location list"))
                         {
                        
@@ -650,6 +678,7 @@ namespace ArdDebug
                                     ListViewItem item = var.CreateVarViewItem();
                                     if (item != null)
                                         varView.Items.Add(var.CreateVarViewItem());
+                                    var = null;
                                     continue;
                                 }
                                 else
@@ -661,25 +690,7 @@ namespace ArdDebug
 
                             }
                         }
-                        index1 = line.LastIndexOf(':');
-                        index2 = line.LastIndexOf(')');
-                        if (index1 < 0 || index2 < 0)
-                            continue;
-                        UInt32 loc = 0;
-                        refStr = line.Substring(index1 + 1, index2 - index1 - 1);
-                        if (uint.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
-                        {
-                            var.Address = (ushort)(loc & 0xFFFF);
-                            Variables.Add(var);
-                            ListViewItem lvi = var.CreateVarViewItem();
-
-                            varView.Items.Add(lvi);
-                            var = null;  // get ready for next one
-                        }
-                        else
-                        {
-                            MessageBox.Show("error parsing variables..(location)..."  + line);
-                        }
+                        
                     }
                     else if (line.Contains("DW_AT_low_pc") && func != null)
                     {
@@ -721,8 +732,8 @@ namespace ArdDebug
                 {
                     if (func == null)
                         continue;
-                    if (func.IsMine == false)
-                        continue;
+                    //if (func.IsMine == false)
+                    //    continue;
                     var = new Variable(this);
                 }
                 else if (line.Contains("DW_TAG_subprogram"))
@@ -850,6 +861,7 @@ namespace ArdDebug
                     if (int.TryParse(item.LocationStr, out offset))
                     {
                         item.FrameOffset = offset;
+                        item.RegisterOffset = 8888; // special value indicating that this is straightforward offset
                     }
 
                 }

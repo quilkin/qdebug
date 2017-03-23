@@ -145,7 +145,7 @@ namespace ArdDebug
                             // we are in the right area.
                             // Is this variable stored directly in a register (now at a fixed offset from frame),
                             //   or offset from that register?
-                            if (item.RegisterOffset == 9999)
+                            if (item.RegisterOffset == 9999 || item.RegisterOffset == 8888)
                             {
                                 // direct 
                                 int offset = item.FrameOffset;
@@ -157,15 +157,37 @@ namespace ArdDebug
                                 { //???? not sure yet!
                                     Address = (ushort)(arduino.currentBreakpoint.FramePointer - offset);
                                 }
+                                if (item.RegisterOffset == 8888)
+                                {
+                                    if (GetData((ushort)(Address), out data))
+                                    {
+                                        if (data > 0x2000)
+                                        {
+                                            // data hi/low needs reversing?
+                                            byte hibyte = (byte)(data & 0x00FF);
+                                            byte lobyte = (byte)(data >> 8);
+                                            data = (ushort)((hibyte << 8) + lobyte);
+                                        }
+                                        Address = data;
+                                    }
+                                    else
+                                        return false;
+                                }
                             }
                             else
                             {
                                 // address of register (pushed on stack)
-                                Address = (ushort)(arduino.currentBreakpoint.FramePointer + item.FrameOffset);
+                                Address = (ushort)(arduino.currentBreakpoint.FramePointer - item.FrameOffset);
                                 // get indirected address by asking for it
-                                if (GetData((ushort)(Address ), out data))
+                                if (GetData((ushort)(Address), out data))
                                 {
-                                    Address = (ushort)(data + item.RegisterOffset);
+                                    if (data > 0x2000) { 
+                                        // data hi/low needs reversing?
+                                        byte hibyte = (byte)(data & 0x00FF);
+                                        byte lobyte = (byte)(data >> 8);
+                                        data = (ushort)((hibyte << 8) + lobyte);
+                                    }
+                                    Address = (ushort)(data - item.RegisterOffset);
                                 }
                                 else
                                     return false;
