@@ -164,10 +164,9 @@ namespace ArdDebug
                         Function func = FindFunctionWithinLine();
                         if (func != null)
                         {
-                            //if (func.Owner == Function.FunctionOwner.Other)
                             if (func.IsMine == false)
                             {
-                                // if so, step over rather than into it.
+                                // Cannot step into library functions, step over rather than into it.
                                 StepOver(true);
                                 return;
                             }
@@ -235,7 +234,7 @@ namespace ArdDebug
             if (!funcChecked)
             {
                 Function func = FindFunctionWithinLine();
-                if (func != null)
+                if (func == null)
                 {
                     // asking to step over but there's no function here, so single step instead
                     //if (func.Owner == Function.FunctionOwner.None)
@@ -811,6 +810,7 @@ namespace ArdDebug
                         item = source.SelectedItems[0];
                         item.Selected = false;
                     }
+                    currentBreakpoint = bp;
                 }
             }
         }
@@ -847,7 +847,25 @@ namespace ArdDebug
             return null;
         }
 
- 
+        public void FunctionList()
+        {
+            if (Functions.Count == 0)
+                return;
+            string funcList = "";
+            foreach (Function func in Functions)
+            {
+                funcList += func.Name;
+                funcList += "\t";
+                funcList += func.fileRef;
+                if (func.IsMine)
+                    funcList += " *";
+                funcList += "\n";
+            }
+            
+            MessageBox.Show(funcList,"Function List");
+            
+
+        }
         
     }
 

@@ -62,6 +62,7 @@
             this.panelRunning = new System.Windows.Forms.Panel();
             this.buttonReload = new System.Windows.Forms.Button();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.buttonFunctions = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
@@ -311,7 +312,7 @@
             // 
             // buttonComms
             // 
-            this.buttonComms.Location = new System.Drawing.Point(670, 617);
+            this.buttonComms.Location = new System.Drawing.Point(670, 623);
             this.buttonComms.Name = "buttonComms";
             this.buttonComms.Size = new System.Drawing.Size(144, 23);
             this.buttonComms.TabIndex = 26;
@@ -363,11 +364,22 @@
             // 
             this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             // 
+            // buttonFunctions
+            // 
+            this.buttonFunctions.Location = new System.Drawing.Point(670, 599);
+            this.buttonFunctions.Name = "buttonFunctions";
+            this.buttonFunctions.Size = new System.Drawing.Size(144, 23);
+            this.buttonFunctions.TabIndex = 31;
+            this.buttonFunctions.Text = "Function List";
+            this.buttonFunctions.UseVisualStyleBackColor = true;
+            this.buttonFunctions.Click += new System.EventHandler(this.buttonFunctions_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(826, 687);
+            this.Controls.Add(this.buttonFunctions);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.buttonReload);
             this.Controls.Add(this.panelRunning);
@@ -430,6 +442,7 @@
         private System.Windows.Forms.Panel panelRunning;
         private System.Windows.Forms.Button buttonReload;
         private System.Windows.Forms.Timer timer1;
+        private System.Windows.Forms.Button buttonFunctions;
     }
 }
 

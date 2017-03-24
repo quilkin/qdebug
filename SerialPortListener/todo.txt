@@ -8,7 +8,7 @@ recover after pause in delay()
 
 check that new sketch has uploaded
 ensure latest version loaded
-
+enum
 //check for use of portd7
 
 catch exceptions
@@ -16,3 +16,5 @@ catch exceptions
 non-UI copies of source & debug lines, to void use of cross-thread delegates?
 
 save com port between sesssions
+flexible window sizes
+current line highlighted while waiting for next

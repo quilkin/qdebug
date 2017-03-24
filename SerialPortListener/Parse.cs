@@ -580,17 +580,27 @@ namespace ArdDebug
                             MessageBox.Show("error parsing variables...(file).." + line);
                         }
                     }
-                    else if (line.Contains("DW_AT_artificial") && func != null)
-                    {
-                        func = null;  // ignore and get ready for next one
-                        var = null;
-                    }
+                    //else if (line.Contains("DW_AT_artificial") && func != null)
+                    //{
+                    //    func = null;  // ignore and get ready for next one
+                    //    var = null;
+                    //}
                     else if (line.Contains("DW_AT_abstract_origin") && var != null)
                     {
                         var = null;  // ignore and get ready for next one
                         continue;
                     }
-                    
+                    else if (line.Contains("Abbrev Number: 0"))
+                    {
+                        // end of section...
+                        var = null;
+                        if (func != null && func.Name != null && func.Name.Length > 0 && func.Name.StartsWith("_")==false)
+                        {
+                            Functions.Add(func);
+                        }
+                        func = null;
+                        continue;
+                    }
                     else if (line.Contains("DW_AT_location") && var != null)
                     {
                         if (line.Contains("DW_OP_stack_value"))
@@ -611,8 +621,8 @@ namespace ArdDebug
                                 var.Address = (ushort)(loc & 0xFFFF);
                                 Variables.Add(var);
                                 ListViewItem lvi = var.CreateVarViewItem();
-
-                                varView.Items.Add(lvi);
+                                if (lvi != null)
+                                    varView.Items.Add(lvi);
                                 var = null;  // get ready for next one
                             }
                             else
@@ -723,6 +733,12 @@ namespace ArdDebug
                             var = null;
                         }
                     }
+                    else if (line.Contains("DW_AT_specification") )
+                    {
+                        // used for structs - not dealing with this yet
+                        func = null;
+                        continue;
+                    }
                 }
                 if (line.Contains("DW_TAG_variable"))
                 {
@@ -731,6 +747,8 @@ namespace ArdDebug
                 else if (line.Contains("DW_TAG_formal_parameter"))
                 {
                     if (func == null)
+                        continue;
+                    if (func.Name == null)
                         continue;
                     //if (func.IsMine == false)
                     //    continue;

@@ -162,7 +162,7 @@ namespace ArdDebug.Serial
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                MessageBox.Show(ex.ToString());
                 return string.Empty;
             }
         }
@@ -213,7 +213,7 @@ namespace ArdDebug.Serial
            // _serialPort.Handshake = Handshake.RequestToSend;
             _serialPort.RtsEnable = true;
             _serialPort.DtrEnable = true;
-            _serialPort.ReadTimeout = 1000;
+            _serialPort.ReadTimeout = 500;
             // Subscribe to event and open serial port for data
             //_serialPort.DataReceived += new SerialDataReceivedEventHandler(_serialPort_DataReceived);
             try

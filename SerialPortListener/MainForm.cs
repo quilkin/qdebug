@@ -186,5 +186,10 @@ namespace ArdDebug
                 panelRunning.BackColor = Color.LimeGreen;
             }
         }
+
+        private void buttonFunctions_Click(object sender, EventArgs e)
+        {
+            Arduino.FunctionList();
+        }
     }
 }
