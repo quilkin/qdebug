@@ -5,8 +5,157 @@ using System.Collections.Generic;
 
 namespace ArdDebug
 {
+    public enum Tags : byte {
+        none,                   compile_unit,
+        base_type,              array_type,                 const_type,
+        volatile_type,          structure_type,             pointer_type,
+        subrange_type,          subroutine_type,            variable,
+        typedef,                unspecified_parameters,     subprogram,
+        member,                 formal_parameter,           inheritance,
+        enumerator,             union_type,                 enumeration_type,
+        reference_type,         inlined_subroutine,         GNU_call_site,
+        GNU_call_site_parameter,lexical_block
+    };
+    public enum Attributes : byte
+    {
+        name,                   decl_file,                  decl_line,
+        low_pc,                 high_pc,                    type,
+        location,               call_file,                  call_line,
+        sibling,                artificial,                 abstract_origin,
+        frame_base,             object_pointer,             MIPS_linkage_name,
+        specification,          stmt_list,                  GNU_call_site_value,
+        GNU_all_call_sites,     GNU_tail_call,
+        byte_size,
+        encoding,
+        external,
+        producer,
+        language,
+        containing_type,
+        data_member_location,
+        accessibility,
+        upper_bound,
+        declaration,
+        const_value,
+        vtable_elem_location,
+        virtuality,
+        inline,
+        entry_pc,
+        ranges
+
+    }
+    class DebugItem
+    {
+        public class Tag
+        {
+            public Tags code;
+            public String def;
+            public Tag (Tags t, string s)
+            {
+                code = t;
+                def = s;
+            }
+        }
+        public class Attribute
+        {
+            public Attributes code;
+            public String def;
+            public Attribute(Attributes a, string s)
+            {
+                code = a;
+                def = s;
+            }
+        }
+        public static readonly List<Attribute> AttributeList = new List<Attribute>
+        {
+            {new Attribute(Attributes.name,"DW_AT_name")},
+            {new Attribute(Attributes.decl_file,"DW_AT_decl_file")},
+            {new Attribute(Attributes.decl_line,"DW_AT_decl_line")},
+            {new Attribute(Attributes.low_pc,"DW_AT_low_pc")},
+            {new Attribute(Attributes.high_pc,"DW_AT_high_pc")},
+            {new Attribute(Attributes.type,"DW_AT_type")},
+            {new Attribute(Attributes.location,"DW_AT_location")},
+            {new Attribute(Attributes.call_file,"DW_AT_call_file")},
+            {new Attribute(Attributes.call_line,"DW_AT_call_line")},
+            {new Attribute(Attributes.sibling,"DW_AT_sibling")},
+            {new Attribute(Attributes.artificial,"DW_AT_artificial")},
+            {new Attribute(Attributes.abstract_origin,"DW_AT_abstract_origin")},
+            {new Attribute(Attributes.frame_base,"DW_AT_frame_base")},
+            {new Attribute(Attributes.object_pointer,"DW_AT_object_pointer")},
+            {new Attribute(Attributes.MIPS_linkage_name,"DW_AT_MIPS_linkage_name")},
+            {new Attribute(Attributes.specification,"DW_AT_specification")},
+            {new Attribute(Attributes.stmt_list,"DW_AT_stmt_list")},
+            {new Attribute(Attributes.GNU_call_site_value,"DW_AT_GNU_call_site_value")},
+            {new Attribute(Attributes.GNU_all_call_sites,"DW_AT_GNU_all_call_sites")},
+            {new Attribute(Attributes.GNU_tail_call,"DW_AT_GNU_tail_call")},
+            {new Attribute(Attributes.byte_size,"DW_AT_byte_size")},
+            {new Attribute(Attributes.encoding,"DW_AT_encoding")},
+            {new Attribute(Attributes.external,"DW_AT_external")},
+            {new Attribute(Attributes.producer,"DW_AT_producer")},
+            {new Attribute(Attributes.language,"DW_AT_language")},
+            {new Attribute(Attributes.containing_type,"DW_AT_containing_type")},
+            {new Attribute(Attributes.data_member_location,"DW_AT_data_member_location")},
+            {new Attribute(Attributes.accessibility,"DW_AT_accessibility")},
+            {new Attribute(Attributes.upper_bound,"DW_AT_upper_bound")},
+            {new Attribute(Attributes.declaration,"DW_AT_declaration")},
+            {new Attribute(Attributes.const_value,"DW_AT_const_value")},
+            {new Attribute(Attributes.vtable_elem_location,"DW_AT_vtable_elem_location")},
+            {new Attribute(Attributes.virtuality,"DW_AT_virtuality")},
+            {new Attribute(Attributes.inline,"DW_AT_inline")},
+            {new Attribute(Attributes.entry_pc,"DW_AT_entry_pc")},
+            {new Attribute(Attributes.ranges,"DW_AT_ranges")},
+        };
+
+        public static readonly List<Tag> TagList = new List<Tag>
+        {
+            {new Tag(Tags.array_type, "DW_TAG_array_type")},
+            {new Tag(Tags.base_type, "DW_TAG_base_type")},
+            {new Tag(Tags.variable, "DW_TAG_variable")},
+            {new Tag(Tags.typedef, "DW_TAG_typedef")},
+            {new Tag(Tags.subprogram, "DW_TAG_subprogram")},
+            {new Tag(Tags.structure_type, "DW_TAG_structure_type")},
+            {new Tag(Tags.member, "DW_TAG_member")},
+            {new Tag(Tags.compile_unit,"DW_TAG_compile_unit")},
+            {new Tag(Tags.const_type,"DW_TAG_const_type")},
+            {new Tag(Tags.volatile_type,"DW_TAG_volatile_type")},
+            {new Tag(Tags.pointer_type,"DW_TAG_pointer_type")},
+            {new Tag(Tags.subrange_type,"DW_TAG_subrange_type")},
+            {new Tag(Tags.subroutine_type,"DW_TAG_subroutine_type")},
+            {new Tag(Tags.typedef,"DW_TAG_typedef")},
+            {new Tag(Tags.unspecified_parameters,"DW_TAG_unspecified_parameters")},
+            {new Tag(Tags.formal_parameter,"DW_TAG_formal_parameter")},
+            {new Tag(Tags.inheritance,"DW_TAG_inheritance")},
+            {new Tag(Tags.enumerator,"DW_TAG_enumerator")},
+            {new Tag(Tags.union_type,"DW_TAG_union_type")},
+            {new Tag(Tags.enumeration_type,"DW_TAG_enumeration_type")},
+            {new Tag(Tags.reference_type,"DW_TAG_reference_type")},
+            {new Tag(Tags.inlined_subroutine,"DW_TAG_inlined_subroutine")},
+            {new Tag(Tags.GNU_call_site,"DW_TAG_GNU_call_site")},
+            {new Tag(Tags.GNU_call_site_parameter,"DW_TAG_GNU_call_site_parameter")},
+            {new Tag(Tags.lexical_block,"DW_TAG_lexical_block")},
+
+        };
+
+        
+    //<1><14>: Abbrev Number: 2 (DW_TAG_base_type)
+    //   <15>   DW_AT_name        : (indirect string, offset: 0xf): uint8_t
+    //   <19> DW_AT_byte_size   : 1
+    //   <1a>   DW_AT_encoding    : 8	(unsigned char)
+        public int Level { get; set; }      // <1>
+        public ushort Ref { get; set; }     // <1a>
+
+        // will have either a tag or an attribute, not both.
+        public Tags tag { get; set; }       // e.g. DW_TAG_formal_parameter
+        public Attributes attr { get; set; }  // e.g. DW_AT_decl_file
+
+        public String content { get; set; } // only for attributes, e.g. "3 byte block: 92 20 2 	(DW_OP_bregx: 32 (r32) 2)"
+
+    }
+
     partial class Arduino
     {
+        List<string> ParseErrors = new List<string>();
+        List<DebugItem> DebugItems = new List<DebugItem>();
+
         private void LookForInitialisedVariables(string line)
         {
             // see which (simple) variables are initialised here
@@ -140,57 +289,10 @@ namespace ArdDebug
 
         }
 
-        private bool ParseDebugInfo(string file)
+        private bool ParseBaseTypes(string file)
         {
-            Variable var = null;
             VariableType varType = null;
-            Function func = null;
-            bool inLocationSection = false;
-            //bool inLocationVariable = false;
 
-            SourceFileRef = 0;
-
-            // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
-
-            // first of all need to find a list of variable types used. Info is in this format:
-            //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
-            //  <6c9>   DW_AT_byte_size   : 2
-            //  <6ca>   DW_AT_encoding    : 5	(signed)
-            //  <6cb>   DW_AT_name        : int
-            VariableTypes.Clear();
-
-            // first find the entry in the File Name Table so we can se which vars are in our source file
-            int linecount = 0;
-            foreach (string line in File.ReadLines(file))
-            {
-
-                if (line.Contains(ShortFilename))
-                {
-                    if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
-                    {
-                        if (line.Contains("DW_AT_name") == false)
-                        {
-                            // 8 3   0   0   qdebugtest.ino
-                            char[] delimiters = new char[] { ' ', '\t' };
-                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                            int fileRef = 0;
-                            if (int.TryParse(parts[0], out fileRef)) {
-                                SourceFileRef = fileRef;
-                            }
-                            break;
-                        }
-                    }
-                }
-                ++linecount;
-            }
-            if (SourceFileRef== 0)
-            {
-                MessageBox.Show("error parsing debug file, no source file abbr found");
-                return false;
-            }
-  
-
-            // find Base types first
             bool insideDef = false;
             foreach (string line in File.ReadLines(file))
             {
@@ -225,7 +327,7 @@ namespace ArdDebug
                         }
                         else
                         {
-                            MessageBox.Show("error parsing variable types.." + line);
+                            ParseErrors.Add("error parsing variable types.." + line);
                         }
                     }
                     else if (line.Contains("DW_AT_name"))
@@ -242,9 +344,6 @@ namespace ArdDebug
                             }
                         }
                     }
-
-
-
                 }
                 if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") == false)
                 {
@@ -274,27 +373,29 @@ namespace ArdDebug
                         MessageBox.Show("error parsing variable types.." + line);
                     }
                 }
-
-
-
             }
+            return true;
+        }
 
-            // find typedefs and volatiles) next
+        bool ParseTypeDefs(string file)
+        {
+            // find typedefs (and volatiles) next
 
             //  for now, we will effectively promote a typedef type to it's base type
 
- //< 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
- //       < 6e1 > DW_AT_name        : (indirect string, offset: 0x37a): uint8_t
- //       < 6e5 > DW_AT_decl_file   : 14
- //       < 6e6 > DW_AT_decl_line   : 126
- //       < 6e7 > DW_AT_type        : < 0x6eb >
-    
- //    < 1 >< 6eb >: Abbrev Number: 2(DW_TAG_base_type)
- //           < 6ec > DW_AT_byte_size   : 1
- //           < 6ed > DW_AT_encoding    : 8(unsigned char)
- //           < 6ee > DW_AT_name        : (indirect string, offset: 0x480): unsigned char
-            insideDef = false;
+            //< 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
+            //       < 6e1 > DW_AT_name        : (indirect string, offset: 0x37a): uint8_t
+            //       < 6e5 > DW_AT_decl_file   : 14
+            //       < 6e6 > DW_AT_decl_line   : 126
+            //       < 6e7 > DW_AT_type        : < 0x6eb >
+
+            //    < 1 >< 6eb >: Abbrev Number: 2(DW_TAG_base_type)
+            //           < 6ec > DW_AT_byte_size   : 1
+            //           < 6ed > DW_AT_encoding    : 8(unsigned char)
+            //           < 6ee > DW_AT_name        : (indirect string, offset: 0x480): unsigned char
+            bool insideDef = false;
             bool volatileVar = false;
+            VariableType varType = null;
 
             foreach (string line in File.ReadLines(file))
             {
@@ -321,7 +422,8 @@ namespace ArdDebug
                         if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
                         {
                             VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
-                            if (baseType != null) { 
+                            if (baseType != null)
+                            {
                                 //varType.BaseType = baseType;
                                 varType.Encoding = baseType.Encoding;
                                 varType.Size = baseType.Size;
@@ -330,9 +432,7 @@ namespace ArdDebug
                             }
                             else
                             {
-
                             }
-              
                         }
                     }
                 }
@@ -365,17 +465,21 @@ namespace ArdDebug
                         MessageBox.Show("error parsing variable types.." + line);
                     }
                 }
-
             }
+            return true;
 
+        }
+
+        private bool ParseArrayTypes(string file)
+        {
             // find Array types, structs and pointers next
-            insideDef = false;
-
+            bool insideDef = false;
             bool pointerVar = false;
             bool structVar = false;
+            VariableType varType = null;
+
             foreach (string line in File.ReadLines(file))
             {
-
                 if (line.Contains(".debug_line"))
                 {
                     // end of the bit we are interested in
@@ -470,9 +574,150 @@ namespace ArdDebug
                         MessageBox.Show("error parsing variable types.." + line);
                     }
                 }
-
             }
+            return true;
 
+        }
+        private bool ParseDebugInfo(string file)
+        {
+            Variable var = null;
+            Function func = null;
+            bool inLocationSection = false;
+
+            // firstly, convert the file into a list of debug items
+            foreach (string line in File.ReadLines(file))
+            {
+                if (line.Contains(".debug_line"))
+                {
+                    // end of the bit we are interested in
+                    break;
+                }
+                char[] delimiters = new char[] { ' ', '<', '>', ':' };
+                string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 3)
+                    continue;
+                DebugItem item = new DebugItem();
+                UInt16 number = 0;
+                if (UInt16.TryParse(parts[0], out number))
+                {
+                    //if (number < 10)
+                    if (line.Contains("Abbrev Number"))
+                    {
+                        // e.g. < 1 >< 22 >: Abbrev Number: 4 (DW_TAG_array_type)
+                        item.Level = number;
+                        if (UInt16.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out number))
+                        {
+                            item.Ref = number;
+                            if (parts.Length > 6)
+                            {
+                                string tagstr = parts[6];
+                                DebugItem.Tag t = DebugItem.TagList.Find(x => x.def == tagstr);
+                                if (t == null)
+                                {
+                                    string err = "missing tag definition: " + tagstr;
+                                    if (ParseErrors.Contains(err) == false)
+                                    {
+                                        ParseErrors.Add(err);
+                                    }
+                                    continue;
+                                }
+                                item.tag = t.code;
+                            }
+                            else
+                            {
+                                item.tag = Tags.none;
+                            }
+                            DebugItems.Add(item);
+                        }
+                        else
+                        {
+                            ParseErrors.Add("Unkown level indicator: " + line);
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        // an attribute line, e.g.     <5e32>   DW_AT_high_pc     : 0x1b82
+                        if (UInt16.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out number))
+                        {
+                            item.Ref = number;
+                            string attrstr = parts[1];
+                            DebugItem.Attribute a = DebugItem.AttributeList.Find(x => x.def == attrstr);
+                            if (a == null)
+                            {
+                                string err = "missing attribute definition: " + attrstr;
+                                if (ParseErrors.Contains(err) == false)
+                                {
+                                    ParseErrors.Add(err);
+                                }
+                                continue;
+                            }
+                            item.attr = a.code;
+                            // rejoin the parts for the rest of the content
+                            string content = "";
+                            for (int p = 2; p < parts.Length; p++)
+                            {
+                                content += parts[p] + " ";
+                            }
+                            item.content = content;
+                            DebugItems.Add(item);
+                        }
+                        else
+                        {
+                            ParseErrors.Add("Unkown reference indicator: " + line);
+                            continue;
+                        }
+                    }
+                }
+            }
+            SourceFileRef = 0;
+
+            // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
+
+            // first of all need to find a list of variable types used. Info is in this format:
+            //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
+            //  <6c9>   DW_AT_byte_size   : 2
+            //  <6ca>   DW_AT_encoding    : 5	(signed)
+            //  <6cb>   DW_AT_name        : int
+            VariableTypes.Clear();
+
+            // first find the entry in the File Name Table so we can se which vars are in our source file
+            int linecount = 0;
+            foreach (string line in File.ReadLines(file))
+            {
+
+                if (line.Contains(ShortFilename))
+                {
+                    if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
+                    {
+                        if (line.Contains("DW_AT_name") == false)
+                        {
+                            // 8 3   0   0   qdebugtest.ino
+                            char[] delimiters = new char[] { ' ', '\t' };
+                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                            int fileRef = 0;
+                            if (int.TryParse(parts[0], out fileRef)) {
+                                SourceFileRef = fileRef;
+                            }
+                            break;
+                        }
+                    }
+                }
+                ++linecount;
+            }
+            if (SourceFileRef== 0)
+            {
+                MessageBox.Show("error parsing debug file, no source file abbr found");
+                return false;
+            }
+            if (ParseBaseTypes(file) == false)
+                return false; 
+            if (ParseTypeDefs(file) == false)
+                return false;
+            if (ParseArrayTypes(file) == false)
+                return false;
+
+            
             // now find the variables themselves. Remove old ones first.
             // Also find our own functions, so we can get local variables inside them
             //  and libray functions, so we can step over them
