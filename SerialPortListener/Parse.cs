@@ -18,30 +18,19 @@ namespace ArdDebug
     };
     public enum Attributes : byte
     {
-        name,                   decl_file,                  decl_line,
+        none,                   decl_file,                  decl_line,
         low_pc,                 high_pc,                    type,
         location,               call_file,                  call_line,
         sibling,                artificial,                 abstract_origin,
         frame_base,             object_pointer,             MIPS_linkage_name,
         specification,          stmt_list,                  GNU_call_site_value,
-        GNU_all_call_sites,     GNU_tail_call,
-        byte_size,
-        encoding,
-        external,
-        producer,
-        language,
-        containing_type,
-        data_member_location,
-        accessibility,
-        upper_bound,
-        declaration,
-        const_value,
-        vtable_elem_location,
-        virtuality,
-        inline,
-        entry_pc,
+        GNU_all_call_sites,     GNU_tail_call,              name,
+        byte_size,              encoding,                   external,
+        producer,               language,                   containing_type,
+        data_member_location,   accessibility,              upper_bound,
+        declaration,            const_value,                vtable_elem_location,
+        virtuality,             inline,                     entry_pc,
         ranges
-
     }
     class DebugItem
     {
@@ -148,14 +137,25 @@ namespace ArdDebug
         public Attributes attr { get; set; }  // e.g. DW_AT_decl_file
 
         public String content { get; set; } // only for attributes, e.g. "3 byte block: 92 20 2 	(DW_OP_bregx: 32 (r32) 2)"
+        public DebugItem()
+        {
 
+        }
     }
 
     partial class Arduino
     {
         List<string> ParseErrors = new List<string>();
         List<DebugItem> DebugItems = new List<DebugItem>();
-
+        private void SaveError(DebugItem item, string err)
+        {
+            string errstr = "";
+            if (item != null)
+                errstr = "Ref <" + item.Ref.ToString("X4") + '>';
+            errstr += err;
+            if (ParseErrors.Contains(err) == false)
+                ParseErrors.Add(err);
+        }
         private void LookForInitialisedVariables(string line)
         {
             // see which (simple) variables are initialised here
@@ -289,51 +289,70 @@ namespace ArdDebug
 
         }
 
+        // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
         private bool ParseBaseTypes(string file)
         {
+            //  need to find a list of variable types used. Info is in this format:
+            //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
+            //     <6c9>   DW_AT_byte_size   : 2
+            //     <6ca>   DW_AT_encoding    : 5	(signed)
+            //     <6cb>   DW_AT_name        : int
+
+            VariableTypes.Clear();
             VariableType varType = null;
 
-            bool insideDef = false;
-            foreach (string line in File.ReadLines(file))
+            foreach (DebugItem item in DebugItems)
             {
-                if (line.Contains(".debug_line"))
+                if (item.Level > 0)
                 {
-                    // end of the bit we are interested in
-                    break;
+                    // end of this item definition, if any, so save it
+                    if (varType != null)
+                    {
+                        VariableTypes.Add(varType);
+                    }
+                    varType = null;
+                    // start of a new one?
+                    if (item.tag == Tags.base_type)
+                    {
+                        varType = new VariableType(item.Ref);
+                        continue;
+                    }
                 }
                 if (varType != null)
                 {
-                    // found something in the previous line
-                    insideDef = true;
-                    if (line.Contains("DW_AT_byte_size"))
+                    // found something in the previous item
+
+                    if (item.attr == Attributes.byte_size)
                     {
-                        int index = line.LastIndexOf(':');
                         int size = 0;
-                        if (int.TryParse(line.Substring(index + 1), out size))
+                        if (int.TryParse(item.content, out size))
                         {
                             varType.Size = size;
                         }
+                        else
+                        {
+                            SaveError(item, item.content + " byte size is not a number");
+                        }
                     }
-                    else if (line.Contains("DW_AT_encoding"))
+                    else if (item.attr == Attributes.encoding)
                     {
-                        int index = line.LastIndexOf(':');
                         int enc = 0;
-                        string encStr = line.Substring(index + 2, 1); // but not 100% sure if these are all < 16 i..e one digit
+                        int index = item.content.LastIndexOf('\t');
+                        string encStr = item.content.Substring(0, index);
                         if (int.TryParse(encStr, out enc))
                         {
                             varType.Encoding = enc;
-                            varType.EncodingString = line.Substring(index + 4);
-
+                            varType.EncodingString = item.content.Substring(index+1);
                         }
                         else
                         {
-                            ParseErrors.Add("error parsing variable types.." + line);
+                            SaveError(item, "undefined type encoding.." + item.content);
                         }
                     }
-                    else if (line.Contains("DW_AT_name"))
+                    else if (item.attr == Attributes.name)
                     {
-                        int index = line.LastIndexOf(':');
-                        varType.Name = line.Substring(index + 1).Trim();
+                        int index = item.content.LastIndexOf(')');
+                        varType.Name = item.content.Substring(index + 1).Trim();
                         if (varType.Name == "__unknown__")
                         {
                             // bug in linker??
@@ -345,34 +364,6 @@ namespace ArdDebug
                         }
                     }
                 }
-                if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") == false)
-                {
-                    // done with previous definition
-                    if (varType != null)
-                    {
-                        VariableTypes.Add(varType);
-                    }
-                    varType = null;
-                    insideDef = false;
-                }
-                if (line.Contains("DW_TAG_base_type") && insideDef == false)
-                {
-                    //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
-                    int index1 = line.LastIndexOf('<');
-                    int index2 = line.LastIndexOf('>');
-                    if (index1 < 0 || index2 < 0)
-                        continue;
-                    UInt16 reference = 0;
-                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
-                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
-                    {
-                        varType = new VariableType(reference);
-                    }
-                    else
-                    {
-                        MessageBox.Show("error parsing variable types.." + line);
-                    }
-                }
             }
             return true;
         }
@@ -380,7 +371,6 @@ namespace ArdDebug
         bool ParseTypeDefs(string file)
         {
             // find typedefs (and volatiles) next
-
             //  for now, we will effectively promote a typedef type to it's base type
 
             //< 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
@@ -389,208 +379,206 @@ namespace ArdDebug
             //       < 6e6 > DW_AT_decl_line   : 126
             //       < 6e7 > DW_AT_type        : < 0x6eb >
 
-            //    < 1 >< 6eb >: Abbrev Number: 2(DW_TAG_base_type)
-            //           < 6ec > DW_AT_byte_size   : 1
-            //           < 6ed > DW_AT_encoding    : 8(unsigned char)
-            //           < 6ee > DW_AT_name        : (indirect string, offset: 0x480): unsigned char
-            bool insideDef = false;
-            bool volatileVar = false;
             VariableType varType = null;
 
-            foreach (string line in File.ReadLines(file))
+            foreach (DebugItem item in DebugItems)
             {
-                if (line.Contains(".debug_line"))
+                if (item.Level > 0)
                 {
-                    // end of the bit we are interested in
-                    break;
+                    // end of this item definition, if any, so save it
+                    if (varType != null)
+                    {
+                        VariableTypes.Add(varType);
+                    }
+                    varType = null;
+                    // start of a new one?
+                    if (item.tag == Tags.volatile_type || item.tag == Tags.typedef)
+                    {
+                        varType = new VariableType(item.Ref);
+                        continue;
+                    }
                 }
                 if (varType != null)
                 {
-                    // found something in the previous line
-                    insideDef = true;
-                    if (line.Contains("DW_AT_name"))
+                    // found something in the previous item
+                    if (item.attr == Attributes.name)
                     {
-                        int index = line.LastIndexOf(':');
-                        varType.Name = line.Substring(index + 1).Trim();
+                        int index = item.content.LastIndexOf(')');
+                        varType.Name = item.content.Substring(index + 1).Trim();
                     }
-                    else if (line.Contains("DW_AT_type") /* && varType.BaseType == null */)
+                    else if (item.attr == Attributes.type)
                     {
-                        int index1 = line.LastIndexOf('<');
-                        int index2 = line.LastIndexOf('>');
                         UInt16 reference = 0;
-                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
-                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                        if (ushort.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out reference))
                         {
                             VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
                             if (baseType != null)
                             {
-                                //varType.BaseType = baseType;
+                                // find type of existing (pre-parsed) base type
                                 varType.Encoding = baseType.Encoding;
                                 varType.Size = baseType.Size;
-                                if (volatileVar)
+                                if (item.tag == Tags.volatile_type)
                                     varType.Name = baseType.Name;
                             }
-                            else
-                            {
-                            }
                         }
-                    }
-                }
-
-                if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") == false)
-                {
-                    // done with previous definition
-                    if (varType != null)
-                    {
-                        VariableTypes.Add(varType);
-                    }
-                    varType = null;
-                    insideDef = false;
-                }
-                if ((line.Contains("DW_TAG_typedef") || line.Contains("DW_TAG_volatile_type")) && insideDef == false)
-                {
-                    volatileVar = line.Contains("DW_TAG_volatile_type");
-
-                    //    < 1 >< 6e0 >: Abbrev Number: 7(DW_TAG_typedef)
-                    int index1 = line.LastIndexOf('<');
-                    int index2 = line.LastIndexOf('>');
-                    UInt16 reference = 0;
-                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
-                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
-                    {
-                        varType = new VariableType(reference);
-                    }
-                    else
-                    {
-                        MessageBox.Show("error parsing variable types.." + line);
+                        else
+                        {
+                            SaveError(item, "undefined type ..." + item.content);
+                        }
                     }
                 }
             }
             return true;
-
         }
 
         private bool ParseArrayTypes(string file)
         {
-            // find Array types, structs and pointers next
-            bool insideDef = false;
-            bool pointerVar = false;
-            bool structVar = false;
+            // find Array types and pointers next
             VariableType varType = null;
+            int prevLevel = 1;
 
-            foreach (string line in File.ReadLines(file))
+            foreach (DebugItem item in DebugItems)
             {
-                if (line.Contains(".debug_line"))
+                if (item.Level > 0)
                 {
-                    // end of the bit we are interested in
-                    break;
+                    if (item.Level == prevLevel)
+                    {
+                        // end of this item definition, if any, so save it
+                        if (varType != null)
+                        {
+                            VariableTypes.Add(varType);
+                        }
+                        varType = null;
+                        if (item.tag == Tags.array_type)
+                        {
+                            varType = new VariableType(item.Ref);
+                            varType.Name = "array";
+                            continue;
+                        }
+                        if (item.tag == Tags.pointer_type)
+                        {
+                            varType = new VariableType(item.Ref);
+                            varType.Name = "pointer";
+                            continue;
+                        }
+                        if (item.tag == Tags.none)
+                        {
+                            // Abbrev Number: 0   ?
+                            --prevLevel;
+                        }
+                    }
+                    else
+                    {
+                        prevLevel = item.Level;
+
+                        // internal definition, continue with it
+                    }
                 }
                 if (varType != null)
                 {
-                    // found something in the previous line
-                    insideDef = true;
-
-                    if (line.Contains(" DW_AT_upper_bound"))
+                    // found something in the previous item
+                    //< 2 >< 2037 >: Abbrev Number: 30(DW_TAG_subrange_type)
+                    // < 2038 > DW_AT_type        : < 0xae0 >
+                    //  < 203c > DW_AT_upper_bound : 9              ... this provides the size of the array
+                    //if (line.Contains(" DW_AT_upper_bound"))
+                    if (item.attr == Attributes.upper_bound)
                     {
-                        //< 2 >< 2037 >: Abbrev Number: 30(DW_TAG_subrange_type)
-                        // < 2038 > DW_AT_type        : < 0xae0 >
-                        //  < 203c > DW_AT_upper_bound : 9              ... this provides the size of the array
-                        int index = line.LastIndexOf(':');
-                        string sizeStr = line.Substring(index + 1).Trim();
-                        ushort size = 0;
-                        if (ushort.TryParse(sizeStr, out size))
+                        UInt16 size = 0;
+                        if (ushort.TryParse(item.content, out size))
                         {
                             varType.Size = size + 1;
                         }
-                    }
-                    else if (line.Contains("DW_AT_name"))
-                    {
-                        int index = line.LastIndexOf(':');
-                        varType.Name = line.Substring(index + 1).Trim();
-                        //VariableTypes.Add(varType);
-                        //varType = null;
-                    }
-                    if (line.Contains("DW_AT_byte_size"))
-                    {
-                        int index = line.LastIndexOf(':');
-                        int size = 0;
-                        if (int.TryParse(line.Substring(index + 1), out size))
+                        else
                         {
-                            varType.Size = size;
+                            SaveError(item, "Array size error: " + item.content);
                         }
                     }
-                    else if (line.Contains("DW_AT_type") && varType.BaseType == null)
+                     else if (item.attr == Attributes.type)
                     {
-                        //< 1f63 > DW_AT_type        : < 0x6c7 >        .... this is base type of an array or pointer
-                        int index1 = line.LastIndexOf('<');
-                        int index2 = line.LastIndexOf('>');
-                        UInt16 reference = 0;
-                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
-                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
+                        if (varType.BaseType == null)
                         {
-                            VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
-                            varType.BaseType = baseType;
+                            UInt16 reference = 0;
+                            if (ushort.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out reference))
+                            {
+                                VariableType baseType = VariableTypes.Find(x => x.Reference == reference);
+                                if (baseType != null)
+                                {
+                                    // find type of existing (pre-parsed) base type
+                                    varType.Encoding = baseType.Encoding;
+                                    varType.Size = baseType.Size;
+                                }
+                            }
+                            else
+                            {
+                                SaveError(item, "undefined type ..." + item.content);
+                            }
                         }
+                        // else this is  a size_type ? (not needed????)
                     }
                 }
 
-                if (insideDef && line.Contains("Abbrev Number") && line.Contains("DW_TAG_subrange_type") == false)
-                {
-                    // done with previous definition
-                    if (varType != null)
-                    {
-                        VariableTypes.Add(varType);
-                    }
-                    varType = null;
-                    insideDef = false;
-                }
-                if ((line.Contains("DW_TAG_array_type") || line.Contains("DW_TAG_pointer_type") || line.Contains("DW_TAG_structure_type")) && insideDef == false)
-                {
-                    // < 1 >< 1f62 >: Abbrev Number: 29(DW_TAG_array_type)
-                    //< 1f63 > DW_AT_type        : < 0x6c7 >        .... points to base type
-                    //< 1f67 > DW_AT_sibling     : < 0x1f72 >
-                    //< 2 >< 2037 >: Abbrev Number: 30(DW_TAG_subrange_type)
-                    // < 2038 > DW_AT_type        : < 0xae0 >
-                    //  < 203c > DW_AT_upper_bound : 9
-
-                    pointerVar = line.Contains("DW_TAG_pointer_type");
-                    structVar = line.Contains("DW_TAG_structure_type");
-                    int index1 = line.LastIndexOf('<');
-                    int index2 = line.LastIndexOf('>');
-                    UInt16 reference = 0;
-                    string refStr = line.Substring(index1 + 1, index2 - index1 - 1);
-                    if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out reference))
-                    {
-                        varType = new VariableType(reference);
-                        varType.Name = "array";
-                        if (pointerVar)
-                            varType.Name = "pointer";
-                        if (structVar)
-                            varType.Name = "struct";
-                    }
-
-                    else
-                    {
-                        MessageBox.Show("error parsing variable types.." + line);
-                    }
-                }
             }
             return true;
 
         }
+        /// <summary>
+        /// find the entry in the File Name Table so we can se which vars are in our source file
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        private int CheckFileReference(string line)
+        {
+            if (line.Contains(ShortFilename))
+            {
+                if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
+                {
+                    if (line.Contains("DW_AT_name") == false)
+                    {
+                        // 8 3   0   0   qdebugtest.ino
+                        char[] delimiters = new char[] { ' ', '\t' };
+                        string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                        int fileRef = 0;
+                        if (int.TryParse(parts[0], out fileRef))
+                        {
+                            return fileRef;
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+
         private bool ParseDebugInfo(string file)
         {
             Variable var = null;
             Function func = null;
             bool inLocationSection = false;
+            //int prevLevel = -1;
+            bool startedItems = false;
+            bool doneItems = false;
 
             // firstly, convert the file into a list of debug items
             foreach (string line in File.ReadLines(file))
             {
+                if (line.StartsWith(" <"))
+                {
+                    startedItems = true;
+                }
+                if (startedItems == false)
+                    continue;
                 if (line.Contains(".debug_line"))
                 {
                     // end of the bit we are interested in
-                    break;
+                    doneItems = true;
+                }
+                if (doneItems)
+                {
+                    SourceFileRef = CheckFileReference(line);
+                    if (SourceFileRef > 0)
+                    {
+                        break;
+                    }
+                    continue;
                 }
                 char[] delimiters = new char[] { ' ', '<', '>', ':' };
                 string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
@@ -598,7 +586,7 @@ namespace ArdDebug
                     continue;
                 DebugItem item = new DebugItem();
                 UInt16 number = 0;
-                if (UInt16.TryParse(parts[0], out number))
+                if (UInt16.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out number))
                 {
                     //if (number < 10)
                     if (line.Contains("Abbrev Number"))
@@ -608,17 +596,14 @@ namespace ArdDebug
                         if (UInt16.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out number))
                         {
                             item.Ref = number;
-                            if (parts.Length > 6)
+                            if (parts.Length > 5)
                             {
-                                string tagstr = parts[6];
+                                string tagstr = parts[5].Replace("(", "");
+                                tagstr = tagstr.Replace(")", "");
                                 DebugItem.Tag t = DebugItem.TagList.Find(x => x.def == tagstr);
                                 if (t == null)
                                 {
-                                    string err = "missing tag definition: " + tagstr;
-                                    if (ParseErrors.Contains(err) == false)
-                                    {
-                                        ParseErrors.Add(err);
-                                    }
+                                    SaveError(item, "missing tag definition: " + tagstr);
                                     continue;
                                 }
                                 item.tag = t.code;
@@ -631,7 +616,7 @@ namespace ArdDebug
                         }
                         else
                         {
-                            ParseErrors.Add("Unkown level indicator: " + line);
+                            SaveError(item, "Unkown level indicator: " + line);
                             continue;
                         }
                     }
@@ -641,15 +626,12 @@ namespace ArdDebug
                         if (UInt16.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out number))
                         {
                             item.Ref = number;
+                            item.Level = -1;
                             string attrstr = parts[1];
                             DebugItem.Attribute a = DebugItem.AttributeList.Find(x => x.def == attrstr);
                             if (a == null)
                             {
-                                string err = "missing attribute definition: " + attrstr;
-                                if (ParseErrors.Contains(err) == false)
-                                {
-                                    ParseErrors.Add(err);
-                                }
+                                SaveError(item, "missing attribute definition: " + attrstr);
                                 continue;
                             }
                             item.attr = a.code;
@@ -664,52 +646,18 @@ namespace ArdDebug
                         }
                         else
                         {
-                            ParseErrors.Add("Unkown reference indicator: " + line);
+                            SaveError(item, "Unkown reference indicator: " + line);
                             continue;
                         }
                     }
                 }
+
             }
-            SourceFileRef = 0;
-
-            // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
-
-            // first of all need to find a list of variable types used. Info is in this format:
-            //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
-            //  <6c9>   DW_AT_byte_size   : 2
-            //  <6ca>   DW_AT_encoding    : 5	(signed)
-            //  <6cb>   DW_AT_name        : int
-            VariableTypes.Clear();
-
-            // first find the entry in the File Name Table so we can se which vars are in our source file
-            int linecount = 0;
-            foreach (string line in File.ReadLines(file))
+            if (SourceFileRef == 0)
             {
+                SaveError(null, "error parsing debug file, no source file abbr found");
+            }
 
-                if (line.Contains(ShortFilename))
-                {
-                    if (line.Contains(ShortFilename + ".elf") == false && line.Contains(ShortFilename + ".cpp") == false) // i.e. not the header line etc
-                    {
-                        if (line.Contains("DW_AT_name") == false)
-                        {
-                            // 8 3   0   0   qdebugtest.ino
-                            char[] delimiters = new char[] { ' ', '\t' };
-                            string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                            int fileRef = 0;
-                            if (int.TryParse(parts[0], out fileRef)) {
-                                SourceFileRef = fileRef;
-                            }
-                            break;
-                        }
-                    }
-                }
-                ++linecount;
-            }
-            if (SourceFileRef== 0)
-            {
-                MessageBox.Show("error parsing debug file, no source file abbr found");
-                return false;
-            }
             if (ParseBaseTypes(file) == false)
                 return false; 
             if (ParseTypeDefs(file) == false)
