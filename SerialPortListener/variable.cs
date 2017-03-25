@@ -92,6 +92,12 @@ namespace ArdDebug
         /// </summary>
         public Function Function { get; set; }
 
+        /// <summary>
+        /// this var is in 'my' source file, not in a library
+        /// </summary>
+        public bool isMine { get; set; }
+        public bool isGlobal { get; set; }
+
         private Arduino arduino;
         private String comString = String.Empty;
         public Variable(Arduino ard)

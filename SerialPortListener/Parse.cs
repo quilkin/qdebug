@@ -30,7 +30,7 @@ namespace ArdDebug
         data_member_location,   accessibility,              upper_bound,
         declaration,            const_value,                vtable_elem_location,
         virtuality,             inline,                     entry_pc,
-        ranges
+        ranges,                 comp_dir,                   prototyped
     }
     class DebugItem
     {
@@ -92,6 +92,8 @@ namespace ArdDebug
             {new Attribute(Attributes.inline,"DW_AT_inline")},
             {new Attribute(Attributes.entry_pc,"DW_AT_entry_pc")},
             {new Attribute(Attributes.ranges,"DW_AT_ranges")},
+            {new Attribute(Attributes.comp_dir,"DW_AT_comp_dir")},
+            {new Attribute(Attributes.prototyped,"DW_AT_prototyped")},
         };
 
         public static readonly List<Tag> TagList = new List<Tag>
@@ -153,8 +155,8 @@ namespace ArdDebug
             if (item != null)
                 errstr = "Ref <" + item.Ref.ToString("X4") + '>';
             errstr += err;
-            if (ParseErrors.Contains(err) == false)
-                ParseErrors.Add(err);
+            if (ParseErrors.Contains(errstr) == false)
+                ParseErrors.Add(errstr);
         }
         private void LookForInitialisedVariables(string line)
         {
@@ -314,6 +316,11 @@ namespace ArdDebug
                     // start of a new one?
                     if (item.tag == Tags.base_type)
                     {
+                        if (item.Level > 1)
+                        {
+                            SaveError(item, "Level 2+ definiton for base type?");
+                            continue;
+                        }
                         varType = new VariableType(item.Ref);
                         continue;
                     }
@@ -383,6 +390,7 @@ namespace ArdDebug
 
             foreach (DebugItem item in DebugItems)
             {
+
                 if (item.Level > 0)
                 {
                     // end of this item definition, if any, so save it
@@ -394,6 +402,11 @@ namespace ArdDebug
                     // start of a new one?
                     if (item.tag == Tags.volatile_type || item.tag == Tags.typedef)
                     {
+                        if (item.Level > 1)
+                        {
+                            SaveError(item, "Level 2+ definiton for typedefs?");
+                            continue;
+                        }
                         varType = new VariableType(item.Ref);
                         continue;
                     }
@@ -439,6 +452,7 @@ namespace ArdDebug
 
             foreach (DebugItem item in DebugItems)
             {
+
                 if (item.Level > 0)
                 {
                     if (item.Level == prevLevel)
@@ -449,18 +463,18 @@ namespace ArdDebug
                             VariableTypes.Add(varType);
                         }
                         varType = null;
-                        if (item.tag == Tags.array_type)
+                        if (item.tag == Tags.array_type || item.tag == Tags.pointer_type)
                         {
+                            if (item.Level > 2)
+                            {
+                                SaveError(item, "Level 3+ definiton for array defs?");
+                                continue;
+                            }
                             varType = new VariableType(item.Ref);
-                            varType.Name = "array";
+                            varType.Name = (item.tag == Tags.array_type )? "array": "pointer";
                             continue;
                         }
-                        if (item.tag == Tags.pointer_type)
-                        {
-                            varType = new VariableType(item.Ref);
-                            varType.Name = "pointer";
-                            continue;
-                        }
+
                         if (item.tag == Tags.none)
                         {
                             // Abbrev Number: 0   ?
@@ -470,7 +484,6 @@ namespace ArdDebug
                     else
                     {
                         prevLevel = item.Level;
-
                         // internal definition, continue with it
                     }
                 }
@@ -548,11 +561,129 @@ namespace ArdDebug
             return 0;
         }
 
-        private bool ParseDebugInfo(string file)
+        bool ParseGlobalVariables()
         {
             Variable var = null;
-            Function func = null;
-            bool inLocationSection = false;
+            foreach (DebugItem item in DebugItems)
+            {
+                //// looking for info like this, to find location of our variables ('numf' is a global in this example)
+                //< 1 >< 1fa7 >: Abbrev Number: 78(DW_TAG_variable)
+                //  < 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): numf
+                //  < 1fac > DW_AT_decl_file   : 7
+                //  < 1fad > DW_AT_decl_line   : 9
+                //  < 1fae > DW_AT_type        : < 0x1fb8 >
+                //  < 1fb2 > DW_AT_location    : 5 byte block: 3 0 1 80 0(DW_OP_addr: 800100)
+                if (item.Level > 0)
+                {
+                    // end of this item definition, if any, so save it
+                    if (var != null)
+                    {
+                        var.isGlobal = true;
+                        Variables.Add(var);
+                        ListViewItem lvi = var.CreateVarViewItem();
+                        if (lvi != null)
+                            varView.Items.Add(var.CreateVarViewItem());
+                    }
+                    var = null;
+                    // start of a new one?
+                    if (item.tag == Tags.variable)
+                    {
+                        if (item.Level > 1)
+                        {
+                            SaveError(item, "Level 2+ definiton for globval var?");
+                            continue;
+                        }
+                        var = new Variable(this);
+                        continue;
+                    }
+                }
+                if (var != null)
+                {
+                    // found something in the previous line
+                    if (item.attr == Attributes.name)
+                    {
+                        //  could be    "< 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): num1"
+                        //  or          "< 1fa8 > DW_AT_name        : num2"
+                        // (not yet sure what the difference is......)
+                        char[] delimiters = new char[] { ' ', ':', ')', '(' };
+                        string[] parts = item.content.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 1)
+                        {
+                            var.Name = parts[0];
+                        }
+                        else
+                        {
+                            var.Name = parts[parts.Length - 1];
+                        }
+                    }
+                    else if (item.attr == Attributes.type)
+                    {
+                        // e.g.    < 1e63 > DW_AT_type        : < 0xb14 >
+                        UInt16 typeRef = 0;
+                        if (ushort.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out typeRef))
+                        {
+                            VariableType vType = VariableTypes.Find(x => x.Reference == typeRef);
+                            if (vType != null)
+                            {
+                                var.Type = vType;
+                            }
+                            else
+                            {
+                                SaveError(item, "cannot find type for global var");
+                            }
+                        }
+                        else
+                        {
+                            SaveError(item, "invalid type ref for global var: " + item.content);
+                        }
+                    }
+                    else if (item.attr == Attributes.decl_file)
+                    {
+                        UInt16 fileRef = 0;
+                        if (ushort.TryParse(item.content, out fileRef))
+                        {
+                            if (fileRef == SourceFileRef)
+                            {
+                                // this variable is part of our source file
+                                var.isMine = true;
+                            }
+                            else
+                            {
+                                var = null;  // ignore for now???
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            SaveError(item, "invalid file ref for var: " + item.content);
+                        }
+                    }
+                    else if (item.attr == Attributes.location)
+                    {
+                        //   < 1f2f > DW_AT_location    : 5 byte block: 3 1f 1 80 0(DW_OP_addr: 80011f)
+                        // don't yet know the significance of the '5 byte block' bit ......
+                        int addrIndex = item.content.LastIndexOf("addr");
+                        UInt32 addr = 0;
+                        if (UInt32.TryParse(item.content.Substring(addrIndex + 5, 6), System.Globalization.NumberStyles.HexNumber, null, out addr))
+                        {
+                            // don't want the '80' bit for this processsor
+                            var.Address = (UInt16)(addr & 0xFFFF);
+                        }
+                        else
+                        {
+                            SaveError(item, "invalid address for var: " + item.content);
+                        }
+                    }
+                }
+
+            }
+            return true;
+        }
+        private bool ParseDebugInfo(string file)
+        {
+            //Variable var = null;
+            //Function func = null;
+            //bool inLocationSection = false;
             //int prevLevel = -1;
             bool startedItems = false;
             bool doneItems = false;
@@ -651,13 +782,13 @@ namespace ArdDebug
                         }
                     }
                 }
-
             }
             if (SourceFileRef == 0)
             {
                 SaveError(null, "error parsing debug file, no source file abbr found");
             }
 
+            // get all the different variable types. Base types first so that array types know about their content
             if (ParseBaseTypes(file) == false)
                 return false; 
             if (ParseTypeDefs(file) == false)
@@ -665,332 +796,46 @@ namespace ArdDebug
             if (ParseArrayTypes(file) == false)
                 return false;
 
-            
-            // now find the variables themselves. Remove old ones first.
-            // Also find our own functions, so we can get local variables inside them
-            //  and libray functions, so we can step over them
+            // Now find the variables themselves.
+            // Remove old ones first.
             varView.Items.Clear();
             varView.Sorting = SortOrder.None;
-            
-            foreach (string line in File.ReadLines(file))
-            {
-                if (inLocationSection & line.Length > 10)
-                {
-                    var = ParseLocations(line, var);
-                    continue;
-                }
-                //if (line.Contains(".debug_line"))
-                //{
-                //    // end of the bit we are interested in
-                //    break;
-                //}
-                //// looking for info like this, to find location of our variables ('numf' is a global in this example)
-                //< 1 >< 1fa7 >: Abbrev Number: 78(DW_TAG_variable)
-                //  < 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): numf
-                //  < 1fac > DW_AT_decl_file   : 7
-                //  < 1fad > DW_AT_decl_line   : 9
-                //  < 1fae > DW_AT_type        : < 0x1fb8 >
-                //  < 1fb2 > DW_AT_location    : 5 byte block: 3 0 1 80 0(DW_OP_addr: 800100)
-                if (var != null || func != null)
-                {
-                    // found something in the previous line
-                    if (line.Contains("DW_AT_name"))
-                    {
-                        //  could be    "< 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): num1"
-                        //  or          "< 1fa8 > DW_AT_name        : num2"
-                        int index = line.LastIndexOf(':');
-                        String name = line.Substring(index + 1).Trim();
-                        if (func != null && func.Name != null && var != null)
-                        {
-                            // this is a local var in a func, must modify its name
-                            var.Name = func.Name + "." + name;
-                        }
-                        else if (func != null)
-                        {
-                            func.Name = name;
-                        }
-                        // We're only interested in vars that occur in our own files, not library files
-                        else
-                        {
-                            var.Name = name;
-                        }
-
-                    }
-                    else if (line.Contains("DW_AT_type"))
-                    {
-                        int index1 = line.LastIndexOf('<');
-                        int index2 = line.LastIndexOf('>');
-                        UInt16 typeRef = 0;
-                        string refStr = line.Substring(index1 + 3, index2 - index1 - 3);
-                        if (ushort.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out typeRef))
-                        {
-                            VariableType vType = VariableTypes.Find(x => x.Reference == typeRef);
-                            if (var != null)
-                                var.Type = vType;
-                            else if (func != null)
-                                func.Type = vType;
-                        }
-                        else
-                        {
-                            MessageBox.Show("error parsing variables..(Type)..." + line);
-                        }
-                    }
-                    else if (line.Contains("DW_AT_decl_file"))
-                    {
-                        int index = line.LastIndexOf(':');
-                        UInt16 fileRef = 0;
-                        string refStr = line.Substring(index + 1);
-                        if (ushort.TryParse(refStr, out fileRef))
-                        {
-                            if (var != null)
-                            {
-                                if (fileRef == SourceFileRef)
-                                {
-                                    // this variable is part of our source file
-                                }
-                                else
-                                {
-                                    var = null;  // ignore and get ready for next one
-                                }
-                            }
-                            else if (func != null)
-                            {
-                                if (fileRef == SourceFileRef)
-                                {
-                                    // this variable is part of our source file
-                                    func.fileRef = fileRef;
-                                }
-                                else
-                                {
-                                    //func= null;  // ignore and get ready for next one
-                                }
-
-                            }
-
-                        }
-                        else
-                        {
-                            MessageBox.Show("error parsing variables...(file).." + line);
-                        }
-                    }
-                    //else if (line.Contains("DW_AT_artificial") && func != null)
-                    //{
-                    //    func = null;  // ignore and get ready for next one
-                    //    var = null;
-                    //}
-                    else if (line.Contains("DW_AT_abstract_origin") && var != null)
-                    {
-                        var = null;  // ignore and get ready for next one
-                        continue;
-                    }
-                    else if (line.Contains("Abbrev Number: 0"))
-                    {
-                        // end of section...
-                        var = null;
-                        if (func != null && func.Name != null && func.Name.Length > 0 && func.Name.StartsWith("_")==false)
-                        {
-                            Functions.Add(func);
-                        }
-                        func = null;
-                        continue;
-                    }
-                    else if (line.Contains("DW_AT_location") && var != null)
-                    {
-                        if (line.Contains("DW_OP_stack_value"))
-                            continue;
-                        int index1, index2;
-                        string refStr;
-                        // local or register var?
-                        if (func == null || func.Name == null)
-                        {
-                            index1 = line.LastIndexOf(':');
-                            index2 = line.LastIndexOf(')');
-                            if (index1 < 0 || index2 < 0)
-                                continue;
-                            UInt32 loc = 0;
-                            refStr = line.Substring(index1 + 1, index2 - index1 - 1);
-                            if (uint.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
-                            {
-                                var.Address = (ushort)(loc & 0xFFFF);
-                                Variables.Add(var);
-                                ListViewItem lvi = var.CreateVarViewItem();
-                                if (lvi != null)
-                                    varView.Items.Add(lvi);
-                                var = null;  // get ready for next one
-                            }
-                            else
-                            {
-                                MessageBox.Show("error parsing variables..(location)..." + line);
-                            }
-                            continue;
-                        }
-
-
-                        if (line.Contains("DW_OP_reg") || line.Contains("DW_OP_breg") || line.Contains("DW_OP_fbreg"))
-                        {
-                            // e.g.   <2474>   DW_AT_location    : 6 byte block: 64 93 1 65 93 1 	(DW_OP_reg20 (r20); DW_OP_piece: 1; DW_OP_reg21 (r21); DW_OP_piece: 1)
-                            int bracket = line.IndexOf('(');
-                            if (bracket < 0)
-                            {
-                                MessageBox.Show("error parsing variables...(location).." + line);
-                            }
-                            LocationItem item = new LocationItem();
-                            // any address valid
-                            item.StartAddr = 0x00000000;
-                            item.EndAddr = 0xFFFFFFFF;
-                            ParseRegisterString(var, item, line.Substring(bracket));
-                            var.Function = func;
-                            Variables.Add(var);
-                            // associate with function so we can update locals only when stepping through function
-                            func.LocalVars.Add(var);
-                            varView.Items.Add(var.CreateVarViewItem());
-                            var = null;
-                            continue;
-                        }
-
-
-                        if (line.Contains("location list"))
-                        {
-                       
-                            // local or register var
-                            if (func == null || func.Name == null)
-                            {
-                                // not in a  functon so not interested
-                                var = null;  // get ready for next one
-                                continue;
-                            }
-                            else if (line.Contains("location list"))
-                            {
-                                // This is in a function. First need to mofify the param name with the function name
-                                // var.Name = func.Name + "." + var.Name;
-                                // start to find location of local variable or formal parameter
-                                //   < 14f7 > DW_AT_location    : 0x656(location list)
-                                index1 = line.LastIndexOf(':');
-                                index2 = line.LastIndexOf('(');
-                                if (index1 < 0 || index2 < 0)
-                                    continue;
-                                UInt16 location = 0;
-                                refStr = line.Substring(index1 + 4, index2 - index1 - 4);
-                                if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out location))
-                                {
-                                    var.Location = location;
-                                    var.Function = func;
-                                    Variables.Add(var);
-                                    // associate with function so we can update locals only when stepping through function
-                                    func.LocalVars.Add(var);
-                                    ListViewItem item = var.CreateVarViewItem();
-                                    if (item != null)
-                                        varView.Items.Add(var.CreateVarViewItem());
-                                    var = null;
-                                    continue;
-                                }
-                                else
-                                {
-                                    MessageBox.Show("error parsing variables..." + var.Name + " has no location");
-                                    var = null;
-                                    continue;
-                                }
-
-                            }
-                        }
-                        
-                    }
-                    else if (line.Contains("DW_AT_low_pc") && func != null)
-                    {
-                        int colon = line.LastIndexOf(": 0x");
-                        UInt16 loc = 0;
-                        string refStr = line.Substring(colon+4);
-                        if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
-                            func.LowPC = loc;
-                    }
-                    else if (line.Contains("DW_AT_high_pc") && func != null)
-                    {
-                        int colon = line.LastIndexOf(": 0x");
-                        UInt16 loc = 0;
-                        string refStr = line.Substring(colon + 4);
-                        if (UInt16.TryParse(refStr, System.Globalization.NumberStyles.HexNumber, null, out loc))
-                            func.HighPC = loc;
-                    }
-                    else if (line.Contains("DW_TAG_subprogram") || line.Contains("DW_TAG_GNU_call_site") || line.Contains("DW_TAG_inlined_subroutine"))
-                    {
-                        if (func != null) { 
-                            // done with this func, onto the next.
-                            if (func.Name != null && func.Name.Length > 0)
-                            {
-                                Functions.Add(func);
-                            }
-                            func = null;
-                        }
-                        if (var != null)
-                        {
-                            var = null;
-                        }
-                    }
-                    else if (line.Contains("DW_AT_specification") )
-                    {
-                        // used for structs - not dealing with this yet
-                        func = null;
-                        continue;
-                    }
-                }
-                if (line.Contains("DW_TAG_variable"))
-                {
-                    var = new Variable(this);
-                }
-                else if (line.Contains("DW_TAG_formal_parameter"))
-                {
-                    if (func == null)
-                        continue;
-                    if (func.Name == null)
-                        continue;
-                    //if (func.IsMine == false)
-                    //    continue;
-                    var = new Variable(this);
-                }
-                else if (line.Contains("DW_TAG_subprogram"))
-                {
-                    func = new Function(this);
-                }
-                else if (line.Contains(".debug_loc"))
-                {
-                    inLocationSection = true;
-                    var = null;
-                }
-            }
-
+            if (ParseGlobalVariables() == false)
+                return false;
+ 
             return true;
         }
 
-        void AddToVarView(Variable var)
-        {
-            ListViewItem lvi = new ListViewItem();
-            lvi.Name = var.Name.ToString();
-            lvi.Text = var.Name.ToString();
-            if (var.Type == null)
-            {
-                MessageBox.Show("error parsing variables..." + var.Name + " has no type");
-                var = null;
-                return;
-            }
-            string typeName = var.Type.Name;
-            if (var.Type.BaseType != null)
-            {
-                // array type etc
-                if (var.Type.Name == "array")
-                {
-                    typeName = var.Type.BaseType.Name + " []";
+        //void AddToVarView(Variable var)
+        //{
+        //    ListViewItem lvi = new ListViewItem();
+        //    lvi.Name = var.Name.ToString();
+        //    lvi.Text = var.Name.ToString();
+        //    if (var.Type == null)
+        //    {
+        //        MessageBox.Show("error parsing variables..." + var.Name + " has no type");
+        //        var = null;
+        //        return;
+        //    }
+        //    string typeName = var.Type.Name;
+        //    if (var.Type.BaseType != null)
+        //    {
+        //        // array type etc
+        //        if (var.Type.Name == "array")
+        //        {
+        //            typeName = var.Type.BaseType.Name + " []";
 
-                }
-                else if (var.Type.Name == "pointer")
-                {
-                    typeName = var.Type.BaseType.Name + " *";
-                }
-            }
-            lvi.SubItems.Add(typeName);
-            lvi.SubItems.Add(var.Address.ToString("X"));
-            lvi.SubItems.Add(var.currentValue);
-            varView.Items.Add(lvi);
-        }
+        //        }
+        //        else if (var.Type.Name == "pointer")
+        //        {
+        //            typeName = var.Type.BaseType.Name + " *";
+        //        }
+        //    }
+        //    lvi.SubItems.Add(typeName);
+        //    lvi.SubItems.Add(var.Address.ToString("X"));
+        //    lvi.SubItems.Add(var.currentValue);
+        //    varView.Items.Add(lvi);
+        //}
         
         private void ParseRegisterString(Variable var, LocationItem item, string toParse)
         {
