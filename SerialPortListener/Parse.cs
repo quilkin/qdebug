@@ -292,7 +292,7 @@ namespace ArdDebug
         }
 
         // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
-        private bool ParseBaseTypes(string file)
+        private bool ParseBaseTypes()
         {
             //  need to find a list of variable types used. Info is in this format:
             //  <1><6c8>: Abbrev Number: 6 (DW_TAG_base_type)
@@ -375,7 +375,7 @@ namespace ArdDebug
             return true;
         }
 
-        bool ParseTypeDefs(string file)
+        bool ParseTypeDefs()
         {
             // find typedefs (and volatiles) next
             //  for now, we will effectively promote a typedef type to it's base type
@@ -444,7 +444,7 @@ namespace ArdDebug
             return true;
         }
 
-        private bool ParseArrayTypes(string file)
+        private bool ParseArrayTypes()
         {
             // find Array types and pointers next
             VariableType varType = null;
@@ -519,6 +519,7 @@ namespace ArdDebug
                                     // find type of existing (pre-parsed) base type
                                     varType.Encoding = baseType.Encoding;
                                     varType.Size = baseType.Size;
+                                    varType.BaseType = baseType;
                                 }
                             }
                             else
@@ -561,6 +562,277 @@ namespace ArdDebug
             return 0;
         }
 
+        bool ParseGlobalFunctions()
+        {
+            // ignore funcs inside classes for now
+            // include parsing of local vars in functions
+            Function func = null;
+            Variable var = null;
+            int currentLevel = 1;
+            foreach (DebugItem item in DebugItems)
+            {
+                // global functions will be marked as level 1
+                // parameters and local vars will be marked as level 2 (or 3+ for included lexical blocks)
+                // a function definition isn't complete until there is another item with level 1
+                // ... so until then, any vars are members of that function
+                if (item.Level == 1)
+                {
+                    // end of this func definition, if any, so save it (if it's been fully defined)
+                    if (func != null && func.Name != null)
+                    {
+                        Functions.Add(func);
+                    }
+                    func = null;
+                    if (item.tag == Tags.subprogram)
+                    {
+                        // a new defintion starts here
+                        func = new Function(this);
+                        continue;
+                    }
+
+                }
+                if (item.Level >= 2)
+                {
+                    // end of a variable or param definition, if any, so save it
+                    if (var != null && var.Name != null)
+                    {
+                        Variables.Add(var);
+                        ListViewItem lvi = var.CreateVarViewItem();
+                        if (lvi != null)
+                            varView.Items.Add(lvi);
+                        var = null;  // get ready for next one
+                    }
+                    var = null;
+                    if (item.tag == Tags.variable || item.tag == Tags.formal_parameter)
+                    {
+                        // a new defintion starts here
+                        var = new Variable(this);
+                        continue;
+                    }
+                   
+                }
+                if (item.Level >= 1)
+                {
+                    currentLevel = item.Level;
+                    if (item.tag == Tags.none)
+                    {
+                        // Abbrev Number: 0   ?
+                        --currentLevel;
+                        continue;
+                    }
+                }
+                
+
+                if (currentLevel >= 2 && var != null)
+                {
+                    // found something in the previous line, and we're dealing with a variable not the function itself
+                    if (func == null)
+                    {
+                        // we've discarded thsi function (not being delat with yet)
+                        // so discard its variables as well
+                        var = null;
+                        continue;
+                    }
+                    if (item.attr == Attributes.artificial)
+                    {
+                        // not interested (at this stage anyway...)
+                        var = null;
+                        continue;
+                    }
+                    if (item.attr == Attributes.name)
+                    {
+                        // this is a local var in a func, must modify its name
+                        var.Name = func.Name + "." + VarNameFromItemContent(item);
+                    }
+                    else if (item.attr == Attributes.type)
+                    {
+                        var.Type = VarTypeFromItemContent(item);
+                    }
+                    else if (item.attr == Attributes.decl_file)
+                    {
+                        var = VarFileReference(item, var);
+                    }
+                    else if (item.attr == Attributes.abstract_origin)
+                    {
+                        // related to inline functions, not dealing with these yet....
+                        var = null;
+                    }
+                    else if (item.attr == Attributes.location)
+                    {
+                        // local vars usually have this type of entry:
+                        //     <10db>   DW_AT_location    : 0x271 (location list)
+                        // also might be this
+                        //       <425a>   DW_AT_location    : 2 byte block: 8c 1 	(DW_OP_breg28 (r28): 1)
+                        if (item.content.Contains("location list"))
+                        {
+                            UInt16 loc = 0;
+                            if (UInt16.TryParse(item.content.Substring(2, 4), System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            {
+                                var.Location = loc;
+                                // actual address to be found later, from the location list at the end of the file
+                            }
+                            else
+                            {
+                                SaveError(item, "error parsing variables..(location)..." + item.content);
+                            }
+                        }
+                        else if (item.content.Contains("DW_OP_reg") || item.content.Contains("DW_OP_breg") || item.content.Contains("DW_OP_fbreg"))
+                        {
+                            // e.g.   <2474>   DW_AT_location    : 6 byte block: 64 93 1 65 93 1 	(DW_OP_reg20 (r20); DW_OP_piece: 1; DW_OP_reg21 (r21); DW_OP_piece: 1)
+                            int bracket = item.content.IndexOf('(');
+                            //if (bracket < 0)
+                            //{
+                            //    MessageBox.Show("error parsing variables...(location).." + line);
+                            //}
+                            LocationItem locItem = new LocationItem();
+                            // any address valid
+                            locItem.StartAddr = 0x00000000;
+                            locItem.EndAddr = 0xFFFFFFFF;
+                            string err = ParseRegisterString(var, locItem, item.content.Substring(bracket));
+                            if (err.Length > 0)
+                                SaveError(item, err);
+                            var.Function = func;
+                            Variables.Add(var);
+                            // associate with function so we can update locals only when stepping through function
+                            func.LocalVars.Add(var);
+                            if (var.Type == null)
+                            {
+                                SaveError(item, "Var has no type: " + item.content);
+                            }
+                            else
+                            {
+                                varView.Items.Add(var.CreateVarViewItem());
+                            }
+                            var = null;
+                            continue;
+                        }
+                        else
+                        {
+                            SaveError(item, "error parsing variables..(location)..." + item.content);
+                        }
+                    }
+
+                }
+                if (currentLevel == 1 && func != null)
+                {
+                    // dealing with the function itself, rather than vars within it
+                    if (item.attr == Attributes.name)
+                    {
+                        func.Name = VarNameFromItemContent(item);
+                    }
+                    else if (item.attr == Attributes.artificial)
+                    {
+                        // not dealing with this (yet?), ignore all included stuff
+                        func = null;
+                    }
+                    else if (item.attr == Attributes.low_pc)
+                    {
+                        //   < f96 > DW_AT_low_pc      : 0x1b4
+                        UInt16 loc = 0;
+                        if (UInt16.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            func.LowPC = loc;
+                    }
+                    else if (item.attr == Attributes.high_pc)
+                    {
+                        UInt16 loc = 0;
+                        if (UInt16.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out loc))
+                            func.HighPC = loc;
+                    }
+                    else if (item.attr == Attributes.decl_file)
+                    {
+                        UInt16 fileRef = 0;
+                        if (ushort.TryParse(item.content, out fileRef))
+                        { 
+                             func.fileRef = fileRef;
+                        }
+                        else
+                        {
+                            SaveError(item, "invalid file ref for function: " + item.content);
+                        }
+                    }
+                    else if (item.attr == Attributes.specification)
+                    {
+                        // used for structs/classes - not dealing with this yet
+                        func = null;
+                        continue;
+                    }
+                    else if (item.attr == Attributes.inline)
+                    {
+                        // not dealing with this yet
+                        func = null;
+                        continue;
+                    }
+
+                }
+
+            }
+            return true;
+        }
+
+
+        string VarNameFromItemContent(DebugItem item)
+        {
+            //  could be    "< 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): num1"
+            //  or          "< 1fa8 > DW_AT_name        : num2"
+            // (not yet sure what the difference is......)
+            char[] delimiters = new char[] { ' ', ':', ')', '(' };
+            string[] parts = item.content.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+            string name;
+            if (parts.Length == 1)
+            {
+                name = parts[0];
+            }
+            else
+            {
+                name = parts[parts.Length - 1];
+            }
+            return name;
+        }
+        VariableType VarTypeFromItemContent(DebugItem item)
+        {
+            // e.g.    < 1e63 > DW_AT_type        : < 0xb14 >
+            UInt16 typeRef = 0;
+            if (ushort.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out typeRef))
+            {
+                VariableType vType = VariableTypes.Find(x => x.Reference == typeRef);
+                if (vType != null)
+                {
+                    return vType;
+                }
+                else
+                {
+                    SaveError(item, "cannot find type for var");
+                }
+            }
+            else
+            {
+                SaveError(item, "invalid type ref for var: " + item.content);
+            }
+            return null;
+        }
+
+        Variable VarFileReference(DebugItem item, Variable var)
+        {
+            UInt16 fileRef = 0;
+            if (ushort.TryParse(item.content, out fileRef))
+            {
+                if (fileRef == SourceFileRef)
+                {
+                    // this variable is part of our source file
+                    var.isMine = true;
+                    return var;
+                }
+                else
+                {
+                    return null;  // ignore for now???
+                }
+            }
+            else
+            {
+                SaveError(item, "invalid file ref for var: " + item.content);
+                return null;
+            }
+        }
         bool ParseGlobalVariables()
         {
             Variable var = null;
@@ -573,7 +845,9 @@ namespace ArdDebug
                 //  < 1fad > DW_AT_decl_line   : 9
                 //  < 1fae > DW_AT_type        : < 0x1fb8 >
                 //  < 1fb2 > DW_AT_location    : 5 byte block: 3 0 1 80 0(DW_OP_addr: 800100)
-                if (item.Level > 0)
+
+                // global var defintions should always be level 1
+                if (item.Level == 1)
                 {
                     // end of this item definition, if any, so save it
                     if (var != null)
@@ -588,11 +862,11 @@ namespace ArdDebug
                     // start of a new one?
                     if (item.tag == Tags.variable)
                     {
-                        if (item.Level > 1)
-                        {
-                            SaveError(item, "Level 2+ definiton for globval var?");
-                            continue;
-                        }
+                        //if (item.Level > 1)
+                        //{
+                        //    SaveError(item, "Level 2+ definiton for global var?");
+                        //    continue;
+                        //}
                         var = new Variable(this);
                         continue;
                     }
@@ -602,61 +876,15 @@ namespace ArdDebug
                     // found something in the previous line
                     if (item.attr == Attributes.name)
                     {
-                        //  could be    "< 1fa8 > DW_AT_name        : (indirect string, offset: 0x208): num1"
-                        //  or          "< 1fa8 > DW_AT_name        : num2"
-                        // (not yet sure what the difference is......)
-                        char[] delimiters = new char[] { ' ', ':', ')', '(' };
-                        string[] parts = item.content.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length == 1)
-                        {
-                            var.Name = parts[0];
-                        }
-                        else
-                        {
-                            var.Name = parts[parts.Length - 1];
-                        }
+                        var.Name = VarNameFromItemContent(item);
                     }
                     else if (item.attr == Attributes.type)
                     {
-                        // e.g.    < 1e63 > DW_AT_type        : < 0xb14 >
-                        UInt16 typeRef = 0;
-                        if (ushort.TryParse(item.content.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out typeRef))
-                        {
-                            VariableType vType = VariableTypes.Find(x => x.Reference == typeRef);
-                            if (vType != null)
-                            {
-                                var.Type = vType;
-                            }
-                            else
-                            {
-                                SaveError(item, "cannot find type for global var");
-                            }
-                        }
-                        else
-                        {
-                            SaveError(item, "invalid type ref for global var: " + item.content);
-                        }
+                        var.Type = VarTypeFromItemContent(item);
                     }
                     else if (item.attr == Attributes.decl_file)
                     {
-                        UInt16 fileRef = 0;
-                        if (ushort.TryParse(item.content, out fileRef))
-                        {
-                            if (fileRef == SourceFileRef)
-                            {
-                                // this variable is part of our source file
-                                var.isMine = true;
-                            }
-                            else
-                            {
-                                var = null;  // ignore for now???
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            SaveError(item, "invalid file ref for var: " + item.content);
-                        }
+                        var = VarFileReference(item, var);
                     }
                     else if (item.attr == Attributes.location)
                     {
@@ -687,6 +915,7 @@ namespace ArdDebug
             //int prevLevel = -1;
             bool startedItems = false;
             bool doneItems = false;
+            ParseErrors.Clear();
 
             // firstly, convert the file into a list of debug items
             foreach (string line in File.ReadLines(file))
@@ -789,11 +1018,11 @@ namespace ArdDebug
             }
 
             // get all the different variable types. Base types first so that array types know about their content
-            if (ParseBaseTypes(file) == false)
+            if (ParseBaseTypes() == false)
                 return false; 
-            if (ParseTypeDefs(file) == false)
+            if (ParseTypeDefs() == false)
                 return false;
-            if (ParseArrayTypes(file) == false)
+            if (ParseArrayTypes() == false)
                 return false;
 
             // Now find the variables themselves.
@@ -802,7 +1031,19 @@ namespace ArdDebug
             varView.Sorting = SortOrder.None;
             if (ParseGlobalVariables() == false)
                 return false;
- 
+            if (ParseGlobalFunctions() == false)
+                return false;
+
+            if (ParseErrors.Count > 0)
+            {
+                string errStr = "";
+                foreach (string err in ParseErrors)
+                {
+                    errStr += (err + '\n');
+                }
+                MessageBox.Show(errStr, "File import failed");
+                return false;
+            }
             return true;
         }
 
@@ -837,7 +1078,7 @@ namespace ArdDebug
         //    varView.Items.Add(lvi);
         //}
         
-        private void ParseRegisterString(Variable var, LocationItem item, string toParse)
+        private string ParseRegisterString(Variable var, LocationItem item, string toParse)
         {
             char[] delimiters = new char[] { ' ', ':', ')', '(' , ';'};
             string[] parts = toParse.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
@@ -877,9 +1118,7 @@ namespace ArdDebug
             }
             else
             {
-                MessageBox.Show("Unknown location in section: " + toParse);
-                return ;
-
+                return ("Unknown location in section: " + toParse);
             }
             if (var != null)
             {
@@ -923,6 +1162,7 @@ namespace ArdDebug
                 }
                 var.Locations.Add(item);
             }
+            return "";
         }
         private Variable ParseLocations(string line, Variable var)
         {

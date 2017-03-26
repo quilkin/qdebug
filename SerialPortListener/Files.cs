@@ -31,6 +31,8 @@ namespace ArdDebug
                         varView.FullRowSelect = true;
                         varView.Click -= Variable_Click;
                         varView.Click += Variable_Click;
+                        //varView.ItemMouseHover -= VarView_ItemMouseHover;
+                        //varView.ItemMouseHover += VarView_ItemMouseHover;
                         varView.Enabled = false;
                         return true;
                     }
@@ -40,6 +42,21 @@ namespace ArdDebug
             MessageBox.Show("Problem opening files");
             return false;
         }
+
+        //private void VarView_ItemMouseHover(object sender, ListViewItemMouseHoverEventArgs e)
+        //{
+        //    if (varView.FocusedItem == null)
+        //        return;
+        //    if (varView.FocusedItem.Bounds.Contains(e.Item.Bounds))
+        //    {
+        //        MenuItem[] mItems =
+        //        { new MenuItem("item1"),
+        //          new MenuItem("item2") };
+        //          ContextMenu cm = new ContextMenu(mItems);
+        //           cm.Show(varView,Cursor.Position);
+        //        }
+
+        //}
 
         private bool OpenSourceFile()
         {
@@ -192,7 +209,8 @@ namespace ArdDebug
             if (doObjDump(startInfo, ".dbg") == false)
                 return false;
             if (ParseDebugInfo(ShortFilename + ".dbg") == false)
-                return false;
+                //return false;
+                return true;
 
 
 
