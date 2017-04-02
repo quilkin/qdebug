@@ -81,15 +81,28 @@ namespace ArdDebug
         System.Drawing.Color breakpointColour = System.Drawing.Color.Red;
         System.Drawing.Color breakpointHitColour = System.Drawing.Color.Orange;
 
-
+        public void NewCommand(string input)
+        {
+                GDB_write(input);
+                //string result = GDB_read();
+        }
         public void Startup(Serial.SerialPortManager _spmanager)
         {
+            currentBreakpoint = null;
+            nextBreakpoint = null;
+
+#if __GDB__
+            OpenGDB();
+            GUI.RunButtons(true);
+            varView.Enabled = true;
+
+
+#else
 
             this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
             comString = string.Empty;
-            currentBreakpoint = null;
-            nextBreakpoint = null;
+
             Send("startup\n");
             // might take  a while for a reset etc
             comString = ReadLine(5000);
@@ -101,8 +114,10 @@ namespace ArdDebug
             }
             GetVariables();
             SingleStep();
+
             GUI.RunButtons(true);
             varView.Enabled = true;
+#endif
         }
 
 

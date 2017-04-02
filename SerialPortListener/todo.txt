@@ -18,3 +18,4 @@ non-UI copies of source & debug lines, to void use of cross-thread delegates?
 save com port between sesssions
 flexible window sizes
 current line highlighted while waiting for next
+closing during reads can lead to never-ending errors

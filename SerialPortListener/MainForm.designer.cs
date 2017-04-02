@@ -63,9 +63,13 @@
             this.buttonReload = new System.Windows.Forms.Button();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.buttonFunctions = new System.Windows.Forms.Button();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.textBoxInput = new System.Windows.Forms.TextBox();
+            this.buttonSend = new System.Windows.Forms.Button();
             baudRateLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
+            this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // baudRateLabel
@@ -101,7 +105,7 @@
             this.groupBox1.Controls.Add(this.baudRateComboBox);
             this.groupBox1.Controls.Add(baudRateLabel);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Location = new System.Drawing.Point(506, 599);
+            this.groupBox1.Location = new System.Drawing.Point(13, 8);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(158, 76);
             this.groupBox1.TabIndex = 11;
@@ -140,17 +144,14 @@
             // 
             // commsData
             // 
-            this.commsData.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
+            this.commsData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.commsData.Font = new System.Drawing.Font("Courier New", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.commsData.Location = new System.Drawing.Point(491, 477);
+            this.commsData.Location = new System.Drawing.Point(491, 465);
             this.commsData.Multiline = true;
             this.commsData.Name = "commsData";
             this.commsData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.commsData.Size = new System.Drawing.Size(333, 116);
+            this.commsData.Size = new System.Drawing.Size(364, 128);
             this.commsData.TabIndex = 13;
-            this.commsData.Visible = false;
             // 
             // buttonPause
             // 
@@ -184,6 +185,8 @@
             // 
             // varView
             // 
+            this.varView.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.varView.BackColor = System.Drawing.SystemColors.GradientInactiveCaption;
             this.varView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnName,
@@ -195,7 +198,7 @@
             this.varView.Location = new System.Drawing.Point(491, 48);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(333, 511);
+            this.varView.Size = new System.Drawing.Size(364, 384);
             this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
@@ -232,6 +235,8 @@
             // 
             // sourceView
             // 
+            this.sourceView.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.sourceView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnBP,
             this.columnLineNum,
@@ -242,7 +247,7 @@
             this.sourceView.Location = new System.Drawing.Point(3, 48);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(485, 619);
+            this.sourceView.Size = new System.Drawing.Size(470, 619);
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -274,6 +279,8 @@
             // 
             // disassemblyView
             // 
+            this.disassemblyView.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
             this.columnText});
@@ -284,7 +291,7 @@
             this.disassemblyView.Location = new System.Drawing.Point(3, 477);
             this.disassemblyView.MultiSelect = false;
             this.disassemblyView.Name = "disassemblyView";
-            this.disassemblyView.Size = new System.Drawing.Size(485, 209);
+            this.disassemblyView.Size = new System.Drawing.Size(470, 209);
             this.disassemblyView.TabIndex = 24;
             this.disassemblyView.UseCompatibleStateImageBehavior = false;
             this.disassemblyView.View = System.Windows.Forms.View.Details;
@@ -312,7 +319,7 @@
             // 
             // buttonComms
             // 
-            this.buttonComms.Location = new System.Drawing.Point(670, 623);
+            this.buttonComms.Location = new System.Drawing.Point(179, 32);
             this.buttonComms.Name = "buttonComms";
             this.buttonComms.Size = new System.Drawing.Size(144, 23);
             this.buttonComms.TabIndex = 26;
@@ -322,7 +329,7 @@
             // 
             // buttonDiss
             // 
-            this.buttonDiss.Location = new System.Drawing.Point(670, 652);
+            this.buttonDiss.Location = new System.Drawing.Point(177, 61);
             this.buttonDiss.Name = "buttonDiss";
             this.buttonDiss.Size = new System.Drawing.Size(144, 23);
             this.buttonDiss.TabIndex = 27;
@@ -366,7 +373,7 @@
             // 
             // buttonFunctions
             // 
-            this.buttonFunctions.Location = new System.Drawing.Point(670, 599);
+            this.buttonFunctions.Location = new System.Drawing.Point(179, 3);
             this.buttonFunctions.Name = "buttonFunctions";
             this.buttonFunctions.Size = new System.Drawing.Size(144, 23);
             this.buttonFunctions.TabIndex = 31;
@@ -374,19 +381,49 @@
             this.buttonFunctions.UseVisualStyleBackColor = true;
             this.buttonFunctions.Click += new System.EventHandler(this.buttonFunctions_Click);
             // 
+            // panel1
+            // 
+            this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.panel1.Controls.Add(this.buttonFunctions);
+            this.panel1.Controls.Add(this.groupBox1);
+            this.panel1.Controls.Add(this.buttonComms);
+            this.panel1.Controls.Add(this.buttonDiss);
+            this.panel1.Location = new System.Drawing.Point(524, 597);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(326, 89);
+            this.panel1.TabIndex = 32;
+            // 
+            // textBoxInput
+            // 
+            this.textBoxInput.Location = new System.Drawing.Point(491, 438);
+            this.textBoxInput.Name = "textBoxInput";
+            this.textBoxInput.Size = new System.Drawing.Size(270, 20);
+            this.textBoxInput.TabIndex = 33;
+            // 
+            // buttonSend
+            // 
+            this.buttonSend.Location = new System.Drawing.Point(775, 438);
+            this.buttonSend.Name = "buttonSend";
+            this.buttonSend.Size = new System.Drawing.Size(75, 23);
+            this.buttonSend.TabIndex = 34;
+            this.buttonSend.Text = "Send";
+            this.buttonSend.UseVisualStyleBackColor = true;
+            this.buttonSend.Click += new System.EventHandler(this.buttonSend_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(826, 687);
-            this.Controls.Add(this.buttonFunctions);
-            this.Controls.Add(this.groupBox1);
+            this.AutoSize = true;
+            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.ClientSize = new System.Drawing.Size(857, 687);
+            this.Controls.Add(this.buttonSend);
+            this.Controls.Add(this.textBoxInput);
+            this.Controls.Add(this.panel1);
             this.Controls.Add(this.buttonReload);
             this.Controls.Add(this.panelRunning);
             this.Controls.Add(this.btnStop);
             this.Controls.Add(this.panelStopped);
-            this.Controls.Add(this.buttonDiss);
-            this.Controls.Add(this.buttonComms);
             this.Controls.Add(this.buttonStepOver);
             this.Controls.Add(this.buttonRun);
             this.Controls.Add(this.commsData);
@@ -403,6 +440,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).EndInit();
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
+            this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -443,6 +481,9 @@
         private System.Windows.Forms.Button buttonReload;
         private System.Windows.Forms.Timer timer1;
         private System.Windows.Forms.Button buttonFunctions;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.TextBox textBoxInput;
+        private System.Windows.Forms.Button buttonSend;
     }
 }
 

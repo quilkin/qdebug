@@ -124,7 +124,7 @@ namespace ArdDebug
             return true;
         }
 
-        private bool OpenDisassembly()
+        string FindElfPath()
         {
             // find the .elf file corresponding to this sketch
             // if more than one, use the latest
@@ -156,7 +156,7 @@ namespace ArdDebug
             { // non-Arduino (Atmel Studio) project
                 // debug files should be in ..\debug relative to source folder
                 string path = FullFilename;
- 
+
                 int index = path.IndexOf("\\src\\");
                 if (index > 0)
                 {
@@ -172,18 +172,26 @@ namespace ArdDebug
                 int lastSlash = elfPath.LastIndexOf("\\");
                 string nameRoot = elfPath.Substring(lastSlash + 1);
 
-                elfPath = elfPath + "\\Debug\\" + nameRoot + ".elf"; 
+                elfPath = elfPath + "\\Debug\\" + nameRoot + ".elf";
 
 
             }
             if (elfPath == null)
             {
                 MessageBox.Show("No compiled files found. You may need to recompile your project");
-                return false;
+                return null;
             }
             // in case path includes spces, argument needs quotes
             elfPath = "\"" + elfPath + "\"";
+            return elfPath;
 
+        }
+
+        private bool OpenDisassembly()
+        {
+            string elfPath = FindElfPath();
+            if (elfPath == null)
+                return false;
             // Use ProcessStartInfo class
             // objdump - d progcount2.ino.elf > progcount2.ino.lss
             ProcessStartInfo startInfo = new ProcessStartInfo();
@@ -202,7 +210,7 @@ namespace ArdDebug
 
             if (ParseDisassembly(ShortFilename + ".lss") == false)
                 return false;
-
+#if !__GDB__
             // debug info file 
             // see http://ccrma.stanford.edu/planetccrma/man/man1/readelf.1.html
             startInfo.Arguments = "-Wilo " + elfPath;
@@ -211,15 +219,93 @@ namespace ArdDebug
             if (ParseDebugInfo(ShortFilename + ".dbg") == false)
                 //return false;
                 return true;
-
-
-
+#endif
             return true;
 
         }
+#if __GDB__
 
- 
+        public Process AvrGdb { get; private set; }
+        private bool OpenGDB()
+        {
+            string elfPath = FindElfPath();
+            if (elfPath == null)
+                return false;
 
+            elfPath = elfPath.Replace('\\', '/');
+            AvrGdb = new Process();
+            AvrGdb.StartInfo.CreateNoWindow = true;
+            AvrGdb.StartInfo.UseShellExecute = false;
+            AvrGdb.StartInfo.FileName = "avr-gdb.exe";
+            AvrGdb.StartInfo.RedirectStandardOutput = true;
+            AvrGdb.StartInfo.RedirectStandardInput = true;
+            AvrGdb.StartInfo.RedirectStandardError = true;
+            AvrGdb.ErrorDataReceived += Avr_gdb_ErrorDataReceived;
+            
+            AvrGdb.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            AvrGdb.StartInfo.Arguments =  elfPath;
+            AvrGdb.OutputDataReceived += AvrGdb_OutputDataReceived;
+            AvrGdb.Start();
+            AvrGdb.BeginOutputReadLine();
+            AvrGdb.BeginErrorReadLine();
+            //AvrGdb.WaitForExit();
+            return true;
+        }
+        static StringBuilder outData = new StringBuilder();
+        static StringBuilder errData = new StringBuilder();
+        private void AvrGdb_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            lock (outData)
+            {
+                string reply = e.Data;
+                if (e.Data.Contains("Reading symbols"))
+                {
+                    UpdateCommsBox(reply, false);
+                    AvrGdb.StandardInput.WriteLine("set serial baud 57600");
+                    AvrGdb.StandardInput.WriteLine("target remote com7");
+                }
+                else
+                    UpdateCommsBox(reply, false);
+            }
 
+        }
+
+        private void Avr_gdb_ErrorDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            lock (errData)
+            {
+                UpdateCommsBox("***" + e.Data + "***", true);
+
+            }
+        }
+        // typical startup conversation:
+        // (gdb) target remote com7
+        // Remote debugging using com7
+        // 0x00001022 in myAdd(a= 20771, b= 5, c= 1) at../src/main.c:55
+        // 55              for (index = 0; index< 5; index++)
+        // (gdb) step
+        // 57                      a += b;
+        // (gdb) step
+        // 58                      a += c;
+        // (gdb)
+        public bool GDB_write(string line)
+        {
+            string reply = "";
+            try
+            {
+                UpdateCommsBox(line, true);
+                AvrGdb.StandardInput.WriteLine(line);
+                return true;
+
+            }
+            catch (Exception ex )
+            {
+                MessageBox.Show(ex.Message);
+                return false;
+            }
+
+        }
+
+#endif
     }
 }

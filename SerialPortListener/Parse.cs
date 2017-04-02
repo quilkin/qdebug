@@ -149,6 +149,8 @@ namespace ArdDebug
     {
         List<string> ParseErrors = new List<string>();
         List<DebugItem> DebugItems = new List<DebugItem>();
+        List<string> LocationStrings = new List<string>();
+
         private void SaveError(DebugItem item, string err)
         {
             string errstr = "";
@@ -212,13 +214,9 @@ namespace ArdDebug
 
         private bool parseSourceFile()
         {
-
             source.Items.Clear();
             disassembly.Items.Clear();
-            varView.Items.Clear();
-            Variables.Clear();
-            MyVariables.Clear();
-            Functions.Clear();
+
             int count = 1;
             int SerialLine = 0;
             bool qdebugConstrFound = false;
@@ -909,13 +907,20 @@ namespace ArdDebug
         }
         private bool ParseDebugInfo(string file)
         {
-            //Variable var = null;
-            //Function func = null;
-            //bool inLocationSection = false;
-            //int prevLevel = -1;
+
+            bool inLocationSection = false;
             bool startedItems = false;
             bool doneItems = false;
+            bool doneFileRef = false;
+
+            DebugItems.Clear();
             ParseErrors.Clear();
+
+            varView.Items.Clear();
+            Variables.Clear();
+            MyVariables.Clear();
+            Functions.Clear();
+            LocationStrings.Clear();
 
             // firstly, convert the file into a list of debug items
             foreach (string line in File.ReadLines(file))
@@ -926,20 +931,33 @@ namespace ArdDebug
                 }
                 if (startedItems == false)
                     continue;
+
+                if (inLocationSection & line.Length > 10)
+                {
+                    // ParseLocations(line);
+                    LocationStrings.Add(line);
+                    continue;
+                }
                 if (line.Contains(".debug_line"))
                 {
-                    // end of the bit we are interested in
+                    // end of main debug definitions
                     doneItems = true;
                 }
-                if (doneItems)
+                else if (line.Contains(".debug_loc"))
+                {
+                    inLocationSection = true;
+                }
+                if (doneItems  && ! doneFileRef)
                 {
                     SourceFileRef = CheckFileReference(line);
                     if (SourceFileRef > 0)
                     {
-                        break;
+                        doneFileRef = true;
+                        
                     }
                     continue;
                 }
+
                 char[] delimiters = new char[] { ' ', '<', '>', ':' };
                 string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length < 3)
@@ -1033,7 +1051,10 @@ namespace ArdDebug
                 return false;
             if (ParseGlobalFunctions() == false)
                 return false;
-
+            foreach (string locStr in LocationStrings)
+            {
+                ParseLocations(locStr);
+            }
             if (ParseErrors.Count > 0)
             {
                 string errStr = "";
@@ -1164,7 +1185,7 @@ namespace ArdDebug
             }
             return "";
         }
-        private Variable ParseLocations(string line, Variable var)
+        private bool ParseLocations(string line)
         {
             // this is an example list of LocationItems (for a single variable) in the debug file:
             // 000006a6 000004ae 000004ca (DW_OP_reg22 (r22); DW_OP_piece: 1; DW_OP_reg23(r23); DW_OP_piece: 1)
@@ -1172,17 +1193,17 @@ namespace ArdDebug
             // 000006c2 000004fe 00000508 (DW_OP_bregx: 32 (r32) 5)
             // 000006cf 00000508 0000050e (DW_OP_fbreg: -5)
             // 000006db<End of list>
-
+            Variable var = null;
             if (line.Contains("End of list"))
             {
-                var = null;
-                return var;
+        //        var = null;
+                return false;
             }
             if (line.Contains("Offset"))
             {
                 // just the column header
-                var = null;
-                return var;
+          //      var = null;
+                return false;
             }
             UInt32 num;
             char[] delimiters = new char[] { ' '};
@@ -1196,7 +1217,7 @@ namespace ArdDebug
                     if (var == null)
                     {
                         // not one of our variables
-                        return null;
+                        return false;
                     }
                 }
                 else
@@ -1302,7 +1323,7 @@ namespace ArdDebug
             //    }
             //    var.Locations.Add(item);
             //}
-            return var;
+            return true;
 
         }
 

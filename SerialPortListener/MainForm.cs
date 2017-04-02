@@ -85,6 +85,7 @@ namespace ArdDebug
                 this.buttonLoad.Select();
                 return;
             }
+            
             RunButtons(false);
             buttonStep.Enabled = false;
             buttonStepOver.Enabled = false;
@@ -190,6 +191,23 @@ namespace ArdDebug
         private void buttonFunctions_Click(object sender, EventArgs e)
         {
             Arduino.FunctionList();
+        }
+        
+        //public string InputText { get; private set; }
+
+        //public bool InputReady { get; set; }
+
+        private void buttonSend_Click(object sender, EventArgs e)
+        {
+            string text = this.textBoxInput.Text;
+            if (text.Length > 2)
+            {
+                //InputText = text;
+                //InputReady = true;
+
+                Arduino.NewCommand(text);
+            }
+
         }
     }
 }

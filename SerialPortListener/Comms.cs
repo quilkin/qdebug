@@ -33,8 +33,13 @@ namespace ArdDebug
                     comms.Text = comms.Text.Remove(0, maxTextLength / 2);
 
                 comms.ForeColor = (sending ? System.Drawing.Color.Red : System.Drawing.Color.Black);
-
+#if __GDB__
+                comms.AppendText(str + Environment.NewLine);
+               
+                
+#else
                 comms.AppendText(str + " ");
+#endif
             }
         }
 
