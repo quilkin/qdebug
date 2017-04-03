@@ -13,7 +13,7 @@ namespace ArdDebug
     partial class Arduino
     {
         delegate void commsDelegate(string str, bool sending);
-        private void UpdateCommsBox(string str, bool sending)
+        public void UpdateCommsBox(string str, bool sending)
         {
             if (comms.InvokeRequired)
             {

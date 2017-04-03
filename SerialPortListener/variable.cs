@@ -33,7 +33,10 @@ namespace ArdDebug
 
         public VariableType BaseType { get; set; }
 
-    public VariableType(UInt16 reference)
+        public bool isStruct { get; set; }
+
+
+        public VariableType(UInt16 reference)
         {
             Reference = reference;
             BaseType = null;
@@ -100,6 +103,11 @@ namespace ArdDebug
 
         private Arduino arduino;
         private String comString = String.Empty;
+
+        /// <summary>
+        /// The file it was declared in
+        /// </summary>
+        public string File { get; set; }
         public Variable(Arduino ard)
         {
             arduino = ard;

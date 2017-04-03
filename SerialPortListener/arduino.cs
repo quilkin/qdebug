@@ -16,7 +16,7 @@ namespace ArdDebug
         {
             GUI = form;
             GUI.RunButtons(false);
-   
+
         }
         private MainForm GUI;
         private ListView source, disassembly, varView;
@@ -44,8 +44,27 @@ namespace ArdDebug
         /// source file reference from .elf file
         /// </summary>
         public int SourceFileRef { private set; get; }
+        public void AddVariable(Variable var, string typename)
+        {
+            VariableType type = VariableTypes.Find(x => x.Name == typename);
+            if (type != null)
+                var.Type = type;
+            Variables.Add(var);
+        }
+        public void AddType(VariableType type)
+        {
+            if (VariableTypes.Find(x => x.Name == type.Name) == null)
+            {
+                VariableTypes.Add(type);
+            }
+        }
+        public void AddFunction(Function func)
+        {
 
-        Serial.SerialPortManager spmanager;
+               Functions.Add(func);
+
+        }
+        public Serial.SerialPortManager spmanager { private set; get; }
 
         public bool pauseReqd { set; get; }
         /// <summary>
@@ -81,25 +100,31 @@ namespace ArdDebug
         System.Drawing.Color breakpointColour = System.Drawing.Color.Red;
         System.Drawing.Color breakpointHitColour = System.Drawing.Color.Orange;
 
+#if __GDB__
+        private GDB gdb;
+
         public void NewCommand(string input)
         {
-                GDB_write(input);
+                gdb.Write(input);
                 //string result = GDB_read();
         }
+#endif
         public void Startup(Serial.SerialPortManager _spmanager)
         {
             currentBreakpoint = null;
             nextBreakpoint = null;
 
+            this.spmanager = _spmanager;
+
 #if __GDB__
-            OpenGDB();
+            gdb = new GDB(this);
+            gdb.Open();
             GUI.RunButtons(true);
             varView.Enabled = true;
 
 
 #else
 
-            this.spmanager = _spmanager;
             spmanager.StartListening();  // this will reset the Arduino
             comString = string.Empty;
 

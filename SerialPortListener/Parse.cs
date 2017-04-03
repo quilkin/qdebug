@@ -279,11 +279,11 @@ namespace ArdDebug
                 return false;
             }
 
-            if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
-            {
-                MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
-                return false;
-            }
+            //if (qdebugConstrFound == false && ShortFilename.EndsWith(".ino"))
+            //{
+            //    MessageBox.Show("You must create a 'QDebug' object as the first line of 'Setup()'");
+            //    return false;
+            //}
 
             return true;
 

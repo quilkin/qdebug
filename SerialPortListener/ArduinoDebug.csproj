@@ -52,6 +52,7 @@
     <Compile Include="Comms.cs" />
     <Compile Include="Files.cs" />
     <Compile Include="function.cs" />
+    <Compile Include="gdb.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

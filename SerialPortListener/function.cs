@@ -22,6 +22,10 @@ namespace ArdDebug
         /// </summary>
         public int fileRef       { get; set; }
 
+        /// <summary>
+        /// The file it was declared in
+        /// </summary>
+        public string File { get; set; }
         public List<Variable> LocalVars { get; set; }
 
         public UInt16 LowPC { get; set; }
