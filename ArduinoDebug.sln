@@ -7,20 +7,44 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArduinoDebug", "SerialPortL
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "qdebugtest", "..\..\..\Arduino\qdebugtest\qdebugtest.vcxproj", "{388DE1CE-F676-41DE-A134-05B6BC5038F1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SendCtrlC", "SendCtrlC\SendCtrlC.vcxproj", "{C47BC500-4004-4F8E-835E-35F5E646EC40}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "qdebug2", "..\..\..\Arduino\qdebug2\qdebug2.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Debug|x64.ActiveCfg = Debug|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Debug|x86.ActiveCfg = Debug|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Debug|x86.Build.0 = Debug|x86
+		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Release|x64.ActiveCfg = Release|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Release|x86.ActiveCfg = Release|x86
 		{D6883E9E-C532-4FDF-AFEE-61C47F8A4A1D}.Release|x86.Build.0 = Release|x86
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x64.ActiveCfg = Debug|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x86.ActiveCfg = Debug|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Debug|x86.Build.0 = Debug|Win32
+		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x64.ActiveCfg = Release|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.ActiveCfg = Release|Win32
 		{388DE1CE-F676-41DE-A134-05B6BC5038F1}.Release|x86.Build.0 = Release|Win32
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Debug|x64.ActiveCfg = Debug|x64
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Debug|x64.Build.0 = Debug|x64
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Debug|x86.ActiveCfg = Debug|Win32
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Debug|x86.Build.0 = Debug|Win32
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Release|x64.ActiveCfg = Release|x64
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Release|x64.Build.0 = Release|x64
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Release|x86.ActiveCfg = Release|Win32
+		{C47BC500-4004-4F8E-835E-35F5E646EC40}.Release|x86.Build.0 = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x64.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x64.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

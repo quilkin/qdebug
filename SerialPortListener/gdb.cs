@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -13,12 +14,17 @@ namespace ArdDebug
         private Arduino _arduino;
         private string lastCommand = null;
         private List<string> responses;
-        private bool typesFound = false;
-        private bool varsFound = false;
+
+        public enum State : byte
+        {
+            init, connected, typesFound, varsFound, funcsFound, main
+        }
+        public State CurrentState { get; private set; }
         public GDB(Arduino ard)
         {
             _arduino = ard;
             responses = new List<string>();
+            CurrentState = State.init;
         }
         private Process AvrGdb; 
 
@@ -38,19 +44,27 @@ namespace ArdDebug
             AvrGdb.StartInfo.RedirectStandardInput = true;
             AvrGdb.StartInfo.RedirectStandardError = true;
 
-            AvrGdb.ErrorDataReceived += Avr_gdb_ErrorDataReceived;
+            AvrGdb.ErrorDataReceived += AvrGdb_ErrorDataReceived;
+            AvrGdb.OutputDataReceived += AvrGdb_OutputDataReceived;
 
             AvrGdb.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
             AvrGdb.StartInfo.Arguments = elfPath;
-            AvrGdb.OutputDataReceived += AvrGdb_OutputDataReceived;
-            AvrGdb.Start();
+
+            if (AvrGdb.Start()== false)
+            {
+                MessageBox.Show("Cannot find 'avr-gdb.exe'");
+                return false;
+            }
             AvrGdb.BeginOutputReadLine();
             AvrGdb.BeginErrorReadLine();
+
+            
 
             //AvrGdb.WaitForExit();
             return true;
         }
-
+        //[DllImport("kernel32.dll", SetLastError = true)]
+        //static extern bool GenerateConsoleCtrlEvent(int sigevent, int dwProcessGroupId);
         public bool Write(string line)
         {
 
@@ -60,8 +74,26 @@ namespace ArdDebug
             {
                 if (line == "break")
                 {
+                    int id = AvrGdb.Id;
+                    // start a new process to send SIGINT to the gdb process....
+                    Process CtrlC = new Process();
+                    CtrlC.StartInfo.CreateNoWindow = true;
+                    CtrlC.StartInfo.UseShellExecute = false;
+                    CtrlC.StartInfo.FileName = "SendCtrlC.exe";
+                    CtrlC.StartInfo.Arguments = id.ToString();
+                    CtrlC.StartInfo.RedirectStandardOutput = true;
+                     CtrlC.StartInfo.RedirectStandardError = true;
+
+                    CtrlC.ErrorDataReceived += AvrGdb_ErrorDataReceived;
+                    CtrlC.OutputDataReceived += AvrGdb_OutputDataReceived;
+                    if (CtrlC.Start() == false)
+                    {
+                        MessageBox.Show("Cannot find 'SendCtrlC.exe'");
+                        return false;
+                    }
+
                     //Process avrgdb = Process.GetProcessesByName("avr-gdb")[0];
-                    //GenerateConsoleCtrlEvent(0 /*CTRL_C_EVENT*/, (uint)avrgdb.SessionId);
+                    //GenerateConsoleCtrlEvent(0 /*CTRL_C_EVENT*/, id);
 
                     //AvrGdb.StandardInput.Write(char.ConvertFromUtf32(3));
                 }
@@ -89,59 +121,91 @@ namespace ArdDebug
             lock (outData)
             {
                 string connection = "target remote " + _arduino.spmanager.CurrentSerialSettings.PortName;
+                string baud = "set serial baud " + _arduino.spmanager.CurrentSerialSettings.BaudRate;
                 string reply = e.Data;
                 if (reply == null)
                     return;
                 _arduino.UpdateCommsBox(reply, false);
 
+                if (CurrentState == State.init)
+                {
+                    // need to connect to the target
 
-                if (reply.Contains("Reading symbols"))
-                {
-                    //_arduino.UpdateCommsBox(reply, false);
-                    AvrGdb.StandardInput.WriteLine("set serial baud 57600");
-                    AvrGdb.StandardInput.WriteLine(connection);
-                }
-                if (reply.Contains("Remote debugging"))
-                {
-                    // can start to collect variable  types
-                    AvrGdb.StandardInput.WriteLine("info types");
-                }
-                else if (reply.Contains("All defined types"))
-                {
-                    // start of list of types, remove previous stuff
-                    responses.Clear();
-                }
-                else if (reply.Contains("All defined variables"))
-                {
-                    // start of list of variables, remove previous stuff
-                    responses.Clear();
-                }
-                else if (reply.Contains("All defined functions"))
-                {
-                    // start of list of functions, remove previous stuff
-                    responses.Clear();
-                }
-                else if (reply.Contains("Non-debugging symbols") )
-                {
-                    if (typesFound == false && varsFound == false)
+                    if (reply.Contains("Reading symbols"))
                     {
-                        // this is the last useful line in the list of types, so parse them
-                        ParseTypes();
-                        typesFound = true;
-                        // go on to read variables
-                        AvrGdb.StandardInput.WriteLine("info variables");
+                        //_arduino.UpdateCommsBox(reply, false);
+                        AvrGdb.StandardInput.WriteLine(baud);
+                        AvrGdb.StandardInput.WriteLine(connection);
                     }
-                    else if (typesFound == true && varsFound == false)
+                    if (reply.Contains("Remote debugging"))
                     {
-                        // this is the last useful line in the list of variables, so parse them
-                        ParseVariables();
-                        varsFound = true;
-                        AvrGdb.StandardInput.WriteLine("info functions");
+                        // can start to collect variable  types
+                        CurrentState = State.connected;
+                        AvrGdb.StandardInput.WriteLine("info types");
                     }
-                    else if (varsFound)
+                }
+                if (CurrentState < State.funcsFound)
+                {
+                    // need to collect some info
+                    if (reply.Contains("All defined types"))
                     {
-                        // this is the last useful line in the list of variables, so parse them
-                        ParseFunctions();
+                        // start of list of types, remove previous stuff
+                        //responses.Clear();
+                    }
+                    else if (reply.Contains("All defined variables"))
+                    {
+                        // start of list of variables, remove previous stuff
+                        //responses.Clear();
+                    }
+                    else if (reply.Contains("All defined functions"))
+                    {
+                        // start of list of functions, remove previous stuff
+                        //responses.Clear();
+                    }
+                    else if (reply.Contains("Non-debugging symbols"))
+                    {
+                        if (CurrentState < State.typesFound)
+                        {
+                            // this is the last useful line in the list of types, so parse them
+                            ParseTypes();
+                            responses.Clear();
+                            CurrentState = State.typesFound;
+                            // go on to read variables
+                            AvrGdb.StandardInput.WriteLine("info variables");
+                        }
+                        else if (CurrentState < State.varsFound)
+                        {
+                            // this is the last useful line in the list of variables, so parse them
+                            ParseVariables();
+                            responses.Clear();
+                            CurrentState = State.varsFound;
+                            AvrGdb.StandardInput.WriteLine("info functions");
+                        }
+                        else if (CurrentState < State.funcsFound)
+                        {
+                            // this is the last useful line in the list of variables, so parse them
+                            ParseFunctions();
+                            responses.Clear();
+                            CurrentState = State.funcsFound;
+                            //AvrGdb.StandardInput.WriteLine("step");
+                            _arduino.GDBReady();
+                        }
+                    }
+
+                }
+                else
+                {
+                    // startup completed.
+                    char[] delimiters = new char[] { ' ', '\t' };
+                    string[] parts = reply.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    int lineNum = 0;
+                    if (parts.Length > 1 && int.TryParse(parts[1],out lineNum))
+                    {
+                        if (CurrentState < State.main)
+                        {
+                            CurrentState = State.main;
+                            //_arduino.GDBReady();
+                        }
                     }
                 }
                 responses.Add(reply);
@@ -229,6 +293,7 @@ namespace ArdDebug
                     string typeName = parts[parts.Length - 2];
                     _arduino.AddVariable(var,typeName);
 
+
                 }
 
             }
@@ -278,12 +343,12 @@ namespace ArdDebug
             }
 
         }
-        private void Avr_gdb_ErrorDataReceived(object sender, DataReceivedEventArgs e)
+        private void AvrGdb_ErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
             lock (errData)
             {
                 _arduino.UpdateCommsBox("***" + e.Data + "***", true);
-
+                System.Media.SystemSounds.Exclamation.Play();
             }
         }
         // typical startup conversation:

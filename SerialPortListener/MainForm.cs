@@ -103,6 +103,7 @@ namespace ArdDebug
             buttonStepOver.Enabled = false;
             buttonRun.Enabled = false;
             buttonPause.Enabled = false;
+            Arduino.Stop();
         }
 
         private void buttonPause_Click(object sender, EventArgs e)

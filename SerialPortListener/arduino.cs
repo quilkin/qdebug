@@ -16,7 +16,7 @@ namespace ArdDebug
         {
             GUI = form;
             GUI.RunButtons(false);
-
+            CurrentState = State.stopped;
         }
         private MainForm GUI;
         private ListView source, disassembly, varView;
@@ -39,7 +39,12 @@ namespace ArdDebug
         /// </summary>
         private Breakpoint nextBreakpoint = null;
         private String comString = String.Empty;
- 
+        private enum State : byte
+        {
+            init, running, stopped
+        }
+        private State CurrentState ;
+
         /// <summary>
         /// source file reference from .elf file
         /// </summary>
@@ -109,19 +114,53 @@ namespace ArdDebug
                 //string result = GDB_read();
         }
 #endif
+        public void Stop()
+        {
+            CurrentState = State.stopped;
+        }
+
+        delegate void readyDelegate();
+        public void GDBReady()
+        {
+            if (varView.InvokeRequired)
+            {
+                readyDelegate d = new readyDelegate(GDBReady);
+                varView.Invoke(d, new object[] { });
+            }
+            else
+            {
+                MessageBox.Show(string.Format("Found {0} variables and {1} functions", Variables.Count, Functions.Count));
+                GUI.RunButtons(true);
+                varView.Enabled = true;
+                foreach (Variable var in Variables)
+                {
+                    if (var.File == this.ShortFilename)
+                    {
+                        ListViewItem lvi = var.CreateVarViewItem();
+                        if (lvi != null)
+                            varView.Items.Add(lvi);
+                    }
+                }
+            }
+
+        }
         public void Startup(Serial.SerialPortManager _spmanager)
         {
+            CurrentState = State.init;
             currentBreakpoint = null;
             nextBreakpoint = null;
 
             this.spmanager = _spmanager;
 
 #if __GDB__
+            varView.Items.Clear();
+            Variables.Clear();
+            MyVariables.Clear();
+            Functions.Clear();
+
             gdb = new GDB(this);
             gdb.Open();
-            GUI.RunButtons(true);
-            varView.Enabled = true;
-
+            // wait for gdb to invoke GDBReady()
 
 #else
 

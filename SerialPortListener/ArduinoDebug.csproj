@@ -88,10 +88,19 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <None Include="target2\qdebug2.ino" />
     <None Include="target\qdebugtest.ino" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="licence.txt" />
+    <Content Include="target2\analog_int.S" />
+    <Content Include="target2\gdb-methods.cpp" />
+    <Content Include="target2\gdb.cpp" />
+    <Content Include="target2\gdb.h" />
+    <Content Include="target2\qdebug.cpp" />
+    <Content Include="target2\qdebug.h" />
+    <Content Include="target2\registers.cpp" />
+    <Content Include="target2\serial_gdb.cpp" />
     <Content Include="target\commonc.cpp" />
     <Content Include="target\commonc.h" />
     <Content Include="target\mySerial.cpp" />

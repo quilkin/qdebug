@@ -28,7 +28,7 @@ namespace ArdDebug
                     return;
                 //if (_Running != null && _Running.IsBusy)
                 //    return;
-                int maxTextLength = 1000; // maximum text length in text box
+                int maxTextLength = 2500; // maximum text length in text box
                 if (comms.TextLength > maxTextLength)
                     comms.Text = comms.Text.Remove(0, maxTextLength / 2);
 

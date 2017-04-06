@@ -15,7 +15,7 @@ namespace ArdDebug.Serial
         public event PropertyChangedEventHandler PropertyChanged;
         string _portName = "";
         string[] _portNameCollection;
-        int _baudRate = 57600;
+        int _baudRate = 250000;
         BindingList<int> _baudRateCollection = new BindingList<int>();
 
 
