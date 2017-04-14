@@ -34,6 +34,8 @@ namespace ArdDebug
         /// where program counter is currently sitting
         /// </summary>
         public Breakpoint currentBreakpoint { private set; get; }
+        public int currentVariable{ private set; get; }
+
         /// <summary>
         /// next place to stop if we skip over a function call
         /// </summary>
@@ -107,13 +109,13 @@ namespace ArdDebug
 
 #if __GDB__
         private GDB gdb;
+        public static AutoResetEvent resultEvent = new AutoResetEvent(false);
 
         public void NewCommand(string input)
         {
                 gdb.Write(input);
-                //string result = GDB_read();
         }
-#endif
+
         public void Stop()
         {
             CurrentState = State.stopped;
@@ -144,6 +146,66 @@ namespace ArdDebug
             }
 
         }
+
+        //public void GDBLine(int linenum)
+        //{
+        //    UpdateSource(linenum-1);
+        //    GetVariables();
+        //}
+        //public void GDBValue(string val)
+        //{
+        //    currentVariable.currentValue = val;
+        //    resultEvent.Set();
+
+        //    UpdateVariableInWindow(currentVariable);
+
+        //}
+
+        private void GetNextVariable()
+        {
+           // currentVariable = index;
+            while (Variables.Count > currentVariable)
+            {
+                 Variable var = Variables[currentVariable++];
+                if (var.File == ShortFilename)
+                {
+                    // send request to GDB
+                    //currentVariable = index;
+                    string name = var.Name;
+                    int arrayBracket = name.IndexOf('[');
+                    if (arrayBracket > 0)
+                    {
+                        name = name.Substring(0, arrayBracket);
+                    }
+                    NewCommand("print " + name);
+                    // wait for reply
+                    return;
+                }
+            }
+            currentVariable = -1;
+        }
+        private void GotResponse(GDB gdb, GDB.Interaction e)
+        {
+            if (e.ev == GDB.Interaction.Ev.var)
+            {
+                if (currentVariable >= 1)
+                {
+                    Variable var = Variables[currentVariable-1];
+                    var.currentValue = e.var;
+                    //resultEvent.Set();
+                    UpdateVariableInWindow(var);
+                    GetNextVariable();
+                }
+            }
+            else if (e.ev == GDB.Interaction.Ev.newline)
+            {
+                UpdateSource(e.linenum - 1);
+                currentVariable = 0;
+                GetNextVariable();
+            }
+        }
+#endif
+
         public void Startup(Serial.SerialPortManager _spmanager)
         {
             CurrentState = State.init;
@@ -160,6 +222,8 @@ namespace ArdDebug
 
             gdb = new GDB(this);
             gdb.Open();
+            gdb.iHandler += new GDB.InteractionHandler(GotResponse);
+           
             // wait for gdb to invoke GDBReady()
 
 #else
@@ -410,10 +474,64 @@ namespace ArdDebug
                 MessageBox.Show(ex.ToString(), "Sorry there has been a problem (B)");
             }
         }
-        
-    
+
+
+#if __GDB__
+
+        //public void Subscribe(GDB gdb)
+        //{
+        //    gdb.iHandler += new GDB.InteractionHandler(GotResult);
+        //}
 
         public void GetVariables()
+        {
+
+            //// first see if we need to also get local variables
+            Function func = null;
+            //if (currentBreakpoint != null)
+            //{
+            //    UInt16 progCounter = currentBreakpoint.ProgramCounter;
+                
+            //    foreach (Function f in Functions)
+            //    {
+            //        if (f.IsMine)
+            //        {
+            //            if (f.HighPC > progCounter && f.LowPC <= progCounter)
+            //            {
+            //                // we are currently 'in' this function
+            //                func = f;
+            //                break;
+            //            }
+            //        }
+
+            //    }
+            //}
+
+            //foreach (Variable var in Variables)
+            //{
+            //    if (func != null)
+            //    {
+            //        if (var.Function != func)
+            //        {
+            //            // We are not in the same function where this variable is used
+            //            continue;
+            //        }
+            //    }
+            //    if (var.File == ShortFilename)
+            //    {
+            //        // send request to GDB
+            //        currentVariable = var;
+            //        NewCommand("print " + var.Name);
+            //        // wait for reply
+            //        //resultEvent.WaitOne();
+            //    }
+
+ 
+            //}
+
+        }
+#else
+                public void GetVariables()
         {
 
             //// first see if we need to also get local variables
@@ -469,8 +587,8 @@ namespace ArdDebug
             UpdateVariableWindow();
 
         }
+#endif
 
-        
         /// <summary>
         /// A list of variables which have been 'expanded' to show contents (of arrays etc)
         /// </summary>
@@ -483,6 +601,7 @@ namespace ArdDebug
         /// <param name="e"></param>
         public void Variable_Click(object sender, EventArgs e)
         {
+#if !__GDB__
             if (varView.SelectedItems.Count == 0)
                 return;
             try
@@ -601,6 +720,7 @@ namespace ArdDebug
             {
                 MessageBox.Show(ex.ToString(), "Sorry there has been a problem (C)");
             }
+#endif
         }
 
         /// <summary>
@@ -619,6 +739,67 @@ namespace ArdDebug
             }
             return false;
         }
+
+#if __GDB__
+        delegate void varViewDelegate(Variable var);
+        void UpdateVariableInWindow(Variable var)
+        {
+            if (varView.InvokeRequired)
+            {
+                varViewDelegate d = new varViewDelegate(UpdateVariableInWindow);
+                varView.Invoke(d, new object[] {var });
+            }
+            else
+            {
+
+                    ListView.ListViewItemCollection vars = varView.Items;
+                    ListViewItem[] lvis = vars.Find(var.Name,false);
+                    if (lvis == null || lvis.Length == 0)
+                        return;
+                    ListViewItem lvi = lvis[0];
+
+                   // if (var.Address != 0)
+                   if (true)
+                    {
+
+                        lvi.SubItems[3].Text = var.currentValue;
+
+                        if (var.currentValue != var.lastValue)
+                        {
+                            lvi.ForeColor = System.Drawing.Color.Red;
+                            // if this is a pointer, and it has changed, 
+                            //   we need to also find a new value for the value pointed to, if it's currently displayed
+                            if (var.Type.Name == "pointer")
+                            {
+                                // get the indirected value of this pointer
+                                ushort indAddr = 0;
+                                if (ushort.TryParse(var.currentValue, out indAddr))
+                                {
+                                    // if it's currently displayed it will be in the list
+                                    var indirect = Variables.Find(x => x.Name == "*" + var.Name);
+                                    if (indirect != null)
+                                    {
+                                        indirect.Address = indAddr;
+                                        indirect.GetValue(null);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            lvi.ForeColor = System.Drawing.Color.Black;
+                        }
+                        var.lastValue = var.currentValue;
+                    }
+                    else
+                    {
+                        //lvi.Text = "  " + lvi.Text;
+                        lvi.BackColor = System.Drawing.Color.Beige;
+                    }
+
+            }
+        }
+#else
         delegate void varViewDelegate();
         void UpdateVariableWindow()
         {
@@ -695,10 +876,11 @@ namespace ArdDebug
                 }
             }
         }
+#endif
         void UpdateCodeWindows(ushort pc)
         {
             UpdateDisassembly(pc);
-            UpdateSource();
+            //UpdateSource();
         }
 
         delegate void updateDissDelegate(ushort pc);
@@ -766,6 +948,40 @@ namespace ArdDebug
             }
         }
 
+
+#if __GDB__
+        delegate void updateSourceDelegate(int linenum);
+        void UpdateSource(int linenum)
+        {
+            if (source.InvokeRequired)
+            {
+                updateSourceDelegate d = new updateSourceDelegate(UpdateSource);
+                source.Invoke(d, new object[] { linenum});
+            }
+            else
+            {
+                if (source == null)
+                    return;
+                // find the line that contains the current breakpoint
+                ListView.ListViewItemCollection sourceItems = source.Items;
+                //int linecount = 0;
+                //bool lineFound = false;
+                if (currentBreakpoint != null)
+                {
+                    source.Items[currentBreakpoint.SourceLine].Selected = false;
+                    currentBreakpoint.SourceLine = linenum;
+                }
+                else
+                {
+                    currentBreakpoint = new Breakpoint("file", linenum);
+                }
+                source.Items[currentBreakpoint.SourceLine].Selected = true;
+                source.Select();
+                source.EnsureVisible(linenum);
+            }
+
+        }
+#else
         delegate void updateSourceDelegate();
         void UpdateSource()
         {
@@ -808,7 +1024,7 @@ namespace ArdDebug
             }
 
         }
-
+#endif
 
 
         private void Source_Click(object sender, EventArgs e)

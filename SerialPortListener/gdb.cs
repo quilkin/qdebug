@@ -17,7 +17,7 @@ namespace ArdDebug
 
         public enum State : byte
         {
-            init, connected, typesFound, varsFound, funcsFound, main
+            init, connected, typesFound, varsFound, funcsFound, main, newline, var
         }
         public State CurrentState { get; private set; }
         public GDB(Arduino ard)
@@ -26,7 +26,24 @@ namespace ArdDebug
             responses = new List<string>();
             CurrentState = State.init;
         }
-        private Process AvrGdb; 
+        private Process AvrGdb;
+
+        public class Interaction : EventArgs
+        {
+            public enum Ev : byte
+            {
+                newline, var
+            }
+            public Ev ev { get; set; }
+            public string var { get; set; }
+            public int linenum { get; set; }
+            public Interaction(Ev ev)
+            {
+                this.ev = ev;
+            }
+        }
+        public event InteractionHandler iHandler;
+        public delegate void InteractionHandler(GDB m, Interaction e);
 
         public bool Open()
         {
@@ -187,7 +204,7 @@ namespace ArdDebug
                             ParseFunctions();
                             responses.Clear();
                             CurrentState = State.funcsFound;
-                            //AvrGdb.StandardInput.WriteLine("step");
+                            AvrGdb.StandardInput.WriteLine("step");
                             _arduino.GDBReady();
                         }
                     }
@@ -196,15 +213,37 @@ namespace ArdDebug
                 else
                 {
                     // startup completed.
+                    // remove the prompt before parsing rest of input
+                    reply = reply.Replace("(gdb)", "");
                     char[] delimiters = new char[] { ' ', '\t' };
                     string[] parts = reply.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                    int lineNum = 0;
-                    if (parts.Length > 1 && int.TryParse(parts[1],out lineNum))
+                    if (parts.Length > 2)
                     {
-                        if (CurrentState < State.main)
+
+                        int linenum = 0;
+                        if (parts[0].StartsWith("$"))
                         {
-                            CurrentState = State.main;
-                            //_arduino.GDBReady();
+                            // result from a 'print variable' request
+                            Arduino.resultEvent.Set();
+                            Interaction varReq = new Interaction(Interaction.Ev.var);
+                            varReq.var = "";
+                            for (int part = 2; part < parts.Length; part++)
+                                varReq.var += parts[part];
+                            iHandler(this, varReq);
+                           // _arduino.GDBValue(parts[2]);
+                        }
+                        
+                        else if (int.TryParse(parts[0], out linenum))
+                        {
+                            if (CurrentState < State.main)
+                            {
+                                CurrentState = State.main;
+
+                            }
+                            Interaction newLine = new Interaction(Interaction.Ev.newline);
+                            newLine.linenum = linenum;
+                            iHandler(this, newLine);
+                            //_arduino.GDBLine(linenum);
                         }
                     }
                 }
