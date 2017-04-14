@@ -31,15 +31,19 @@ namespace ArdDebug
         public int Encoding { get; set; }
         public string EncodingString { get; set; }
 
+#if !__GDB__
         public VariableType BaseType { get; set; }
+                public bool isStruct { get; set; }
+#endif
 
-        public bool isStruct { get; set; }
 
 
         public VariableType(UInt16 reference)
         {
             Reference = reference;
+#if !__GDB__
             BaseType = null;
+#endif
         }
     }
 
@@ -79,7 +83,11 @@ namespace ArdDebug
         public UInt16 Address { get; set; }
         public string currentValue { get; set; }
         public string lastValue { get; set; }
-
+#if __GDB__
+        public bool isArray { get; set; }
+        public bool isStruct { get; set; }
+        public bool isPointer { get; set; }
+#else
         /// <summary>
         /// Used for location of local variables
         /// Just gives a pointer to the location section of the debug file
@@ -90,6 +98,7 @@ namespace ArdDebug
         /// A list of the actual locations of a local variable, found from the location section
         /// </summary>
         public List<LocationItem> Locations;
+#endif
         /// <summary>
         /// The function that this var appears in (if any) : only for local and parameter variables
         /// </summary>
@@ -112,9 +121,11 @@ namespace ArdDebug
         {
             arduino = ard;
             currentValue = string.Empty;
+#if !__GDB__
             Locations = new List<LocationItem>();
+#endif
         }
-
+#if !__GDB__
         private bool GetData(UInt16 address, out UInt16 data)
         {
             String sendStr;
@@ -253,6 +264,7 @@ namespace ArdDebug
             }
             return true;
         }
+#endif
         public ListViewItem CreateVarViewItem()
         {
  
@@ -266,6 +278,7 @@ namespace ArdDebug
                 return null;
             }
             string typeName = Type.Name;
+#if !__GDB__
             if (Type.BaseType != null)
             {
                 // array type etc
@@ -279,8 +292,9 @@ namespace ArdDebug
                     typeName = Type.BaseType.Name + " *";
                 }
             }
-            lvi.SubItems.Add(typeName);
-            lvi.SubItems.Add(Address.ToString("X"));
+#endif
+            //lvi.SubItems.Add(typeName);
+            //lvi.SubItems.Add(Address.ToString("X"));
             //if (Address != 0)
             lvi.SubItems.Add(currentValue);
  

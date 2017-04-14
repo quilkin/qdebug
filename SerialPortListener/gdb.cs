@@ -32,7 +32,7 @@ namespace ArdDebug
         {
             public enum Ev : byte
             {
-                newline, var
+                ready, newline, var
             }
             public Ev ev { get; set; }
             public string var { get; set; }
@@ -167,7 +167,7 @@ namespace ArdDebug
                     if (reply.Contains("All defined types"))
                     {
                         // start of list of types, remove previous stuff
-                        //responses.Clear();
+                        responses.Clear();
                     }
                     else if (reply.Contains("All defined variables"))
                     {
@@ -204,8 +204,10 @@ namespace ArdDebug
                             ParseFunctions();
                             responses.Clear();
                             CurrentState = State.funcsFound;
-                            AvrGdb.StandardInput.WriteLine("step");
-                            _arduino.GDBReady();
+                            Interaction ready = new Interaction(Interaction.Ev.ready);
+                            iHandler(this, ready);
+                           // AvrGdb.StandardInput.WriteLine("step");
+                           // _arduino.GDBReady();
                         }
                     }
 
@@ -224,7 +226,7 @@ namespace ArdDebug
                         if (parts[0].StartsWith("$"))
                         {
                             // result from a 'print variable' request
-                            Arduino.resultEvent.Set();
+                            //Arduino.resultEvent.Set();
                             Interaction varReq = new Interaction(Interaction.Ev.var);
                             varReq.var = "";
                             for (int part = 2; part < parts.Length; part++)
@@ -266,7 +268,7 @@ namespace ArdDebug
                 {
                     // just the intro line
                 }
-                else if (line.Contains("Non - debugging symbols"))
+                else if (line.Contains("Non-debugging symbols"))
                 {
                     // last line of interest
                     break;
@@ -284,12 +286,14 @@ namespace ArdDebug
                         {
                             continue;
                         }
-                        else if (part == "struct")
-                        {
-                            type.isStruct = true;
-                        }
+                        //else if (part == "struct")
+                        //{
+                        //    type.isStruct = true;
+                        //}
                         else
                         {
+                            if (p > 1 || typename == "struct")
+                                typename += " ";
                             typename += part;
                         }
                     }
@@ -315,22 +319,31 @@ namespace ArdDebug
                 else if (line.Contains("All defined variables"))
                 {
                     // just the intro line
+                    continue;
+                }
+                else if (line.Contains("Non-debugging symbols"))
+                {
+                    continue;
+                }
+                else if (line.StartsWith("0x00"))
+                {
+                    continue;
                 }
                 else if (line.Contains("<unknown>"))
                 {
                     // last line we're interrested in, so can ignore rest
                     break;
                 }
-                else if (line.Length > 2)
+                else if (line.Length > 1)
                 {
                     Variable var = new Variable(_arduino);
                     char[] delimiters = new char[] { ' ', ';' };
                     string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-
-                    var.Name = parts[parts.Length - 1];
+                    //if (parts.Length < 3)
+                    //    continue;
+                    
                     var.File = currentFile;
-                    string typeName = parts[parts.Length - 2];
-                    _arduino.AddVariable(var,typeName);
+                    _arduino.AddVariable(var,parts);
 
 
                 }

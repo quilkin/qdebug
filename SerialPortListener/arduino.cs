@@ -51,11 +51,27 @@ namespace ArdDebug
         /// source file reference from .elf file
         /// </summary>
         public int SourceFileRef { private set; get; }
-        public void AddVariable(Variable var, string typename)
+        public void AddVariable(Variable var, string[] typeParts)
         {
+            int len = typeParts.Length;
+            var.Name = typeParts[len - 1];
+            string typename = typeParts[len - 2];
+            if (typeParts[0] == "struct")
+                typename = "struct " + typename;
             VariableType type = VariableTypes.Find(x => x.Name == typename);
             if (type != null)
                 var.Type = type;
+            foreach (string part in typeParts)
+            {
+                if (part == "struct")
+                    var.isStruct = true;
+                if (part == "*")
+                    var.isPointer = true;
+            }
+            if (var.Name.Contains("["))
+            {
+                var.isArray = true;
+            }
             Variables.Add(var);
         }
         public void AddType(VariableType type)
@@ -122,7 +138,7 @@ namespace ArdDebug
         }
 
         delegate void readyDelegate();
-        public void GDBReady()
+        private void GDBReady()
         {
             if (varView.InvokeRequired)
             {
@@ -131,7 +147,7 @@ namespace ArdDebug
             }
             else
             {
-                MessageBox.Show(string.Format("Found {0} variables and {1} functions", Variables.Count, Functions.Count));
+                //MessageBox.Show(string.Format("Found {0} variables and {1} functions", Variables.Count, Functions.Count));
                 GUI.RunButtons(true);
                 varView.Enabled = true;
                 foreach (Variable var in Variables)
@@ -146,20 +162,6 @@ namespace ArdDebug
             }
 
         }
-
-        //public void GDBLine(int linenum)
-        //{
-        //    UpdateSource(linenum-1);
-        //    GetVariables();
-        //}
-        //public void GDBValue(string val)
-        //{
-        //    currentVariable.currentValue = val;
-        //    resultEvent.Set();
-
-        //    UpdateVariableInWindow(currentVariable);
-
-        //}
 
         private void GetNextVariable()
         {
@@ -202,6 +204,11 @@ namespace ArdDebug
                 UpdateSource(e.linenum - 1);
                 currentVariable = 0;
                 GetNextVariable();
+            }
+            else if (e.ev == GDB.Interaction.Ev.ready)
+            {
+                GDBReady();
+                NewCommand("step");
             }
         }
 #endif
@@ -478,10 +485,7 @@ namespace ArdDebug
 
 #if __GDB__
 
-        //public void Subscribe(GDB gdb)
-        //{
-        //    gdb.iHandler += new GDB.InteractionHandler(GotResult);
-        //}
+
 
         public void GetVariables()
         {
@@ -601,7 +605,127 @@ namespace ArdDebug
         /// <param name="e"></param>
         public void Variable_Click(object sender, EventArgs e)
         {
-#if !__GDB__
+#if __GDB__
+            if (varView.SelectedItems.Count == 0)
+                return;
+            try
+            {
+                ListViewItem clicked = varView.SelectedItems[0];
+                string itemName = clicked.Name;
+                Variable var = Variables.Find(x => x.Name == itemName);
+                if (var == null)
+                    return;
+                if (var.isArray || var.isPointer || var.isStruct)
+                {
+                    // can be expanded
+                    if (expandedItems.Contains(clicked) == false)
+                    {
+                        // This row is not expanded.
+                        // Expand item to show contents of this compound variable
+                        int size = var.Type.Size;
+                        int index = clicked.Index;
+                        //ushort addr = var.Address;
+
+                        // note that this row is expanded, so we can contract it again later
+                        expandedItems.Add(clicked);
+                        
+                        if (var.isPointer)
+                        {
+                            // todo
+                        }
+                        else if (var.isArray)
+                        {
+                            // get the individual array elements
+                            // e.g. {elem1,elem2,elem3,...}
+                            char[] delimiters = new char[] { '{', '}', ',' ,' '};
+                            string[] arrayElements = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                            int i = 0;
+                            int bracket = itemName.IndexOf('[');
+                            string varName = itemName.Substring(0, bracket);
+                            foreach (string elem in arrayElements) 
+                            {
+                                Variable arrayElement = new Variable(this);
+                                arrayElement.Type = var.Type;
+                                arrayElement.currentValue = elem;
+                                arrayElement.Name = varName + '[' + i + ']';
+                                // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
+                                Variables.Add(arrayElement);
+
+                                  // create a new row and display it
+                                string[] items = { "  " + arrayElement.Name, arrayElement.currentValue };
+                                ListViewItem arrayItem = new ListViewItem(items);
+                                arrayItem.Name = arrayElement.Name;
+                                arrayItem.BackColor = System.Drawing.Color.Azure;
+                                varView.Items.Insert(++index, arrayItem);
+
+                                // tag the new row with the row that was expanded, so we can easily unexpand later
+                                clicked.Tag = itemName;      // this should be unique
+                                arrayItem.Tag = clicked.Tag;
+                                ++i;
+                            }
+                        }
+                        else if (var.isStruct)
+                        {
+                            // get the individual struct elements
+                            // e.g. {elem1=1,elem2=3,elem3=4.5,...}
+                            char[] delimiters = new char[] { '{', '}', ',', ' ','=' };
+                            string[] structMembers = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                            int i = 0;
+                            for (int elem=0; elem < structMembers.Length; elem+=2)
+                            {
+                                Variable structMember = new Variable(this);
+                                structMember.Type = var.Type;
+                                structMember.currentValue = structMembers[elem+1];
+                                structMember.Name = itemName + '.'+ structMembers[elem]; 
+                                // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
+                                Variables.Add(structMember);
+
+                                // create a new row and display it
+                                string[] items = { "  " + structMember.Name, structMember.currentValue };
+                                ListViewItem structItem = new ListViewItem(items);
+                                structItem.Name = structMember.Name;
+                                structItem.BackColor = System.Drawing.Color.Azure;
+                                varView.Items.Insert(++index, structItem);
+
+                                // tag the new row with the row that was expanded, so we can easily unexpand later
+                                clicked.Tag = itemName;      // this should be unique
+                                structItem.Tag = clicked.Tag;
+                                ++i;
+                            }
+                        }
+
+                        //UpdateVariableWindow();
+                    }
+                    else
+                    {
+                        // This row has already been expanded.
+                        // Unexpand the added items, and remove the extra temporary variables
+
+                        foreach (ListViewItem item in varView.Items)
+                        {
+                            if (item.Tag != null && item != clicked)
+                            {
+                                // this was an expanded row. Was it expanded under the row that was clicked?
+                                if (item.Tag.ToString() == clicked.Tag.ToString())
+                                {
+                                    // yes, remove it
+                                    string varName = item.Name;
+                                    Variable arrayVar = Variables.Find(x => x.Name == varName);
+                                    Variables.Remove(arrayVar);
+                                    varView.Items.Remove(item);
+                                }
+                            }
+                        }
+                        expandedItems.Remove(clicked);
+                        clicked.Tag = null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), "Sorry there has been a problem (C)");
+            }
+#else
             if (varView.SelectedItems.Count == 0)
                 return;
             try
@@ -762,14 +886,14 @@ namespace ArdDebug
                    if (true)
                     {
 
-                        lvi.SubItems[3].Text = var.currentValue;
+                        lvi.SubItems[1].Text = var.currentValue;
 
                         if (var.currentValue != var.lastValue)
                         {
                             lvi.ForeColor = System.Drawing.Color.Red;
                             // if this is a pointer, and it has changed, 
                             //   we need to also find a new value for the value pointed to, if it's currently displayed
-                            if (var.Type.Name == "pointer")
+                            if (var.isPointer)
                             {
                                 // get the indirected value of this pointer
                                 ushort indAddr = 0;
@@ -780,7 +904,7 @@ namespace ArdDebug
                                     if (indirect != null)
                                     {
                                         indirect.Address = indAddr;
-                                        indirect.GetValue(null);
+                                      //  indirect.GetValue(null);
                                     }
                                 }
                             }
@@ -799,6 +923,49 @@ namespace ArdDebug
 
             }
         }
+        //delegate void varViewDelegate2();
+        //void UpdateVariableWindow()
+        //{
+        //    if (varView.InvokeRequired)
+        //    {
+        //        varViewDelegate2 d = new varViewDelegate2(UpdateVariableWindow);
+        //        varView.Invoke(d, new object[] { });
+        //    }
+        //    else
+        //    {
+
+        //        foreach (Variable var in Variables)
+        //        {
+        //            ListView.ListViewItemCollection vars = varView.Items;
+        //            ListViewItem[] lvis = vars.Find(var.Name, false);
+        //            if (lvis == null || lvis.Length == 0)
+        //                continue;
+        //            ListViewItem lvi = lvis[0];
+
+        //            //if (var.Address != 0)
+        //            if (true)
+        //            {
+        //                lvi.SubItems[3].Text = var.currentValue;
+
+        //                if (var.Type.Name == "array")
+        //                {
+
+        //                }
+        //                else if (var.Type.Name == "pointer")
+        //                {
+        //                    // show address pointed to (in hex)
+        //                }
+
+        //            }
+        //            else
+        //            {
+        //                //lvi.Text = "  " + lvi.Text;
+        //                lvi.BackColor = System.Drawing.Color.Beige;
+        //            }
+        //        }
+        //    }
+        //}
+
 #else
         delegate void varViewDelegate();
         void UpdateVariableWindow()

@@ -33,7 +33,7 @@ namespace ArdDebug
             SerialSettings mySerialSettings = _spManager.CurrentSerialSettings;
             serialSettingsBindingSource.DataSource = mySerialSettings;
             portNameComboBox.DataSource = mySerialSettings.PortNameCollection;
-            baudRateComboBox.DataSource = mySerialSettings.BaudRateCollection;
+            //baudRateComboBox.DataSource = mySerialSettings.BaudRateCollection;
 
             this.FormClosing += new FormClosingEventHandler(MainForm_FormClosing);
             this.timer1.Enabled = false;

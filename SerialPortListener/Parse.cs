@@ -288,7 +288,7 @@ namespace ArdDebug
             return true;
 
         }
-
+#if !__GDB__
         // info from http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf
         private bool ParseBaseTypes()
         {
@@ -1326,7 +1326,7 @@ namespace ArdDebug
             return true;
 
         }
-
+#endif  // not __GDB__
         /// <summary>
         /// Using a line in the disassembly (e.g. C:\Users\chris\Documents\Arduino\qdebugtest/qdebugtest.ino:48)
         /// find the source line number at the end
