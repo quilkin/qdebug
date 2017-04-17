@@ -70,7 +70,13 @@ namespace ArdDebug
             }
             if (var.Name.Contains("["))
             {
-                var.isArray = true;
+                int arrayBracket = var.Name.IndexOf('[');
+                if (arrayBracket > 0)
+                {
+                    var.Name = var.Name.Substring(0, arrayBracket);
+                    var.isArray = true;
+                }
+                
             }
             Variables.Add(var);
         }
@@ -129,12 +135,18 @@ namespace ArdDebug
 
         public void NewCommand(string input)
         {
-                gdb.Write(input);
+            if (input == "step")
+            {
+                gdb.SetState(GDB.State.step);
+            }
+
+            gdb.Write(input);
         }
 
         public void Stop()
         {
             CurrentState = State.stopped;
+            gdb.Kill();
         }
 
         delegate void readyDelegate();
@@ -159,58 +171,146 @@ namespace ArdDebug
                             varView.Items.Add(lvi);
                     }
                 }
+                gdb.PromptReady = false;
             }
 
         }
 
-        private void GetNextVariable()
+        private void DisplayNextVariable()
         {
-           // currentVariable = index;
             while (Variables.Count > currentVariable)
             {
-                 Variable var = Variables[currentVariable++];
+                Variable var = Variables[currentVariable++];
                 if (var.File == ShortFilename)
                 {
                     // send request to GDB
-                    //currentVariable = index;
                     string name = var.Name;
                     int arrayBracket = name.IndexOf('[');
                     if (arrayBracket > 0)
                     {
                         name = name.Substring(0, arrayBracket);
                     }
-                    NewCommand("print " + name);
+                    NewCommand("display " + name);
                     // wait for reply
                     return;
                 }
             }
             currentVariable = -1;
         }
+
         private void GotResponse(GDB gdb, GDB.Interaction e)
         {
-            if (e.ev == GDB.Interaction.Ev.var)
+            if (e.state == GDB.State.setGlobals)
             {
-                if (currentVariable >= 1)
+                if (currentVariable >= 0 && currentVariable < Variables.Count)
                 {
-                    Variable var = Variables[currentVariable-1];
-                    var.currentValue = e.var;
-                    //resultEvent.Set();
-                    UpdateVariableInWindow(var);
-                    GetNextVariable();
+                    Variable var = Variables[currentVariable];
+                    DisplayNextVariable();
+                }
+                else
+                {
+                    // dealt with all the vars, can start debugging
+                    gdb.SetState(GDB.State.ready);
+                    GDBReady();
+                    //     NewCommand("step");
                 }
             }
-            else if (e.ev == GDB.Interaction.Ev.newline)
+            else if (e.state == GDB.State.getGlobals)
             {
+                if (gdb.PromptReady)
+                {
+                    // got all globals; ask for any locals
+                    gdb.SetState(GDB.State.getLocals);
+                    NewCommand("info locals");
+                    return;
+                }
+                // e.var contains something like "var=3" or "var={3,4,5}"
+                string[] parts = e.var.Split('=');
+                Variable var = Variables.Find(x => parts[0] == x.Name);
+                if (var != null)
+                {
+                    var.currentValue = parts[1];
+                    UpdateVariableInWindow(var);
+                }
+
+            }
+            else if (e.state == GDB.State.getLocals)
+            { 
+                if (e.var.Contains("No locals"))
+                {
+                    NewCommand("info args");
+                    return;
+                }
+                if (gdb.PromptReady)
+                {
+                    gdb.SetState(GDB.State.getArgs);
+                    NewCommand("info args");
+                    return;
+                }
+                // e.var contains something like "var=3" or "var={3,4,5}"
+                string[] parts = e.var.Split('=');
+                // locals won't be in the list of variables
+                Variable var = new Variable(this);
+                var.Name = parts[0];
+                var.currentValue = parts[1];
+                var.isGlobal = false;
+                UpdateVariableInWindow(var);
+
+
+            }
+            else if (e.state == GDB.State.getArgs)
+            {
+                if (e.var.Contains("No arguments"))
+                {
+                    return;
+                }
+                if (gdb.PromptReady)
+                {
+                    return;
+                    // wait for new command from user
+                }
+                // e.var contains something like "var=3" or "var={3,4,5}"
+                string[] parts = e.var.Split('=');
+                // locals won't be in the list of variables
+                Variable var = new Variable(this);
+                var.Name = parts[0];
+                var.currentValue = parts[1];
+                var.isGlobal = false;
+                UpdateVariableInWindow(var);
+
+
+            }
+            else if (e.state == GDB.State.step)
+            {
+                if (gdb.PromptReady)
+                {
+                    return;
+                    // wait for new command from user
+                }
                 UpdateSource(e.linenum - 1);
-                currentVariable = 0;
-                GetNextVariable();
-            }
-            else if (e.ev == GDB.Interaction.Ev.ready)
-            {
-                GDBReady();
-                NewCommand("step");
-            }
+                //if (gdb.PromptReady)
+                {
+                    gdb.SetState(GDB.State.getGlobals);
+                }
+                    // every line, we need to see what any local vars are doing
+
+                    //// wait for locals to come back. This is  acrude way of doing it, but don't know how many there will be...
+                    //System.Timers.Timer t = new System.Timers.Timer(100);
+                    //t.Elapsed += getArgs;
+                    //t.AutoReset = false;
+                    //t.Start();
+
+                }
+            //else if (e.state == GDB.State.ready)
+            //{
+            //    GDBReady();
+            //    // start to tell GDB what variables to display
+            //    gdb.SetState(GDB.State.getGlobals);
+            //    currentVariable = 0;
+            //    DisplayNextVariable();
+            //}
         }
+
 #endif
 
         public void Startup(Serial.SerialPortManager _spmanager)
@@ -300,6 +400,7 @@ namespace ArdDebug
 
         public void SingleStep(bool funcChecked = false)
         {
+
             if (source.InvokeRequired)
             {
                 SingleStepDelegate d = new SingleStepDelegate(SingleStep);
@@ -376,9 +477,9 @@ namespace ArdDebug
 
         }
 
-        /// <summary>
-        /// need to set a temporary breakpoint, avoiding any function calls
-        /// </summary>
+            /// <summary>
+            /// need to set a temporary breakpoint, avoiding any function calls
+            /// </summary>
         public void StepOver(bool funcChecked = false)
         {
             if (!funcChecked)
@@ -628,7 +729,8 @@ namespace ArdDebug
 
                         // note that this row is expanded, so we can contract it again later
                         expandedItems.Add(clicked);
-                        
+                        // show it can be unexpanded later
+                        clicked.Text = "-";
                         if (var.isPointer)
                         {
                             // todo
@@ -640,19 +742,19 @@ namespace ArdDebug
                             char[] delimiters = new char[] { '{', '}', ',' ,' '};
                             string[] arrayElements = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
                             int i = 0;
-                            int bracket = itemName.IndexOf('[');
-                            string varName = itemName.Substring(0, bracket);
+                            //int bracket = itemName.IndexOf('[');
+                            //string varName = itemName.Substring(0, bracket);
                             foreach (string elem in arrayElements) 
                             {
                                 Variable arrayElement = new Variable(this);
                                 arrayElement.Type = var.Type;
                                 arrayElement.currentValue = elem;
-                                arrayElement.Name = varName + '[' + i + ']';
+                                arrayElement.Name = itemName + '[' + i + ']';
                                 // temporarily add the expanded item to the list of variables, so it will be updated during single-stepping etc.
                                 Variables.Add(arrayElement);
 
                                   // create a new row and display it
-                                string[] items = { "  " + arrayElement.Name, arrayElement.currentValue };
+                                string[] items = { " ","  " + arrayElement.Name, arrayElement.currentValue };
                                 ListViewItem arrayItem = new ListViewItem(items);
                                 arrayItem.Name = arrayElement.Name;
                                 arrayItem.BackColor = System.Drawing.Color.Azure;
@@ -681,7 +783,7 @@ namespace ArdDebug
                                 Variables.Add(structMember);
 
                                 // create a new row and display it
-                                string[] items = { "  " + structMember.Name, structMember.currentValue };
+                                string[] items = {" ", "  " + structMember.Name, structMember.currentValue };
                                 ListViewItem structItem = new ListViewItem(items);
                                 structItem.Name = structMember.Name;
                                 structItem.BackColor = System.Drawing.Color.Azure;
@@ -694,13 +796,13 @@ namespace ArdDebug
                             }
                         }
 
-                        //UpdateVariableWindow();
+                        UpdateVariableWindow();
                     }
                     else
                     {
                         // This row has already been expanded.
                         // Unexpand the added items, and remove the extra temporary variables
-
+                        clicked.Text = "+";
                         foreach (ListViewItem item in varView.Items)
                         {
                             if (item.Tag != null && item != clicked)
@@ -871,100 +973,99 @@ namespace ArdDebug
             if (varView.InvokeRequired)
             {
                 varViewDelegate d = new varViewDelegate(UpdateVariableInWindow);
-                varView.Invoke(d, new object[] {var });
+                varView.Invoke(d, new object[] { var });
+            }
+            else
+            {
+                ListViewItem lvi;
+
+                ListView.ListViewItemCollection vars = varView.Items;
+                    ListViewItem[] lvis = vars.Find(var.Name, false);
+
+
+                if (lvis == null || lvis.Length == 0)
+                {
+                    if (var.isGlobal == false)
+                    {
+                        lvi = var.CreateVarViewItem();
+                        lvi.SubItems[1].Text = "  " + lvi.SubItems[1].Text;
+                        lvi.BackColor = System.Drawing.Color.Beige;
+                        varView.Items.Insert(varView.Items.Count, lvi);
+                        
+                    }
+                    else
+                        return;
+                }
+                else
+                {
+                    lvi = lvis[0];
+                }
+
+                lvi.SubItems[2].Text = var.currentValue;
+
+                if (var.currentValue != var.lastValue)
+                {
+                    lvi.ForeColor = System.Drawing.Color.Red;
+                    // if this is a pointer, and it has changed, 
+                    //   we need to also find a new value for the value pointed to, if it's currently displayed
+                    if (var.isPointer)
+                    {
+                        // get the indirected value of this pointer
+                        ushort indAddr = 0;
+                        if (ushort.TryParse(var.currentValue, out indAddr))
+                        {
+                            // if it's currently displayed it will be in the list
+                            var indirect = Variables.Find(x => x.Name == "*" + var.Name);
+                            if (indirect != null)
+                            {
+                                indirect.Address = indAddr;
+                                //  indirect.GetValue(null);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    lvi.ForeColor = System.Drawing.Color.Black;
+                }
+                var.lastValue = var.currentValue;
+
+            }
+
+
+        }
+        delegate void varViewDelegate2();
+        void UpdateVariableWindow()
+        {
+            if (varView.InvokeRequired)
+            {
+                varViewDelegate2 d = new varViewDelegate2(UpdateVariableWindow);
+                varView.Invoke(d, new object[] { });
             }
             else
             {
 
+                foreach (Variable var in Variables)
+                {
                     ListView.ListViewItemCollection vars = varView.Items;
-                    ListViewItem[] lvis = vars.Find(var.Name,false);
+                    ListViewItem[] lvis = vars.Find(var.Name, false);
                     if (lvis == null || lvis.Length == 0)
-                        return;
+                        continue;
                     ListViewItem lvi = lvis[0];
-
-                   // if (var.Address != 0)
-                   if (true)
+                    if (var.currentValue != var.lastValue)
                     {
+                        lvi.ForeColor = System.Drawing.Color.Red;
 
-                        lvi.SubItems[1].Text = var.currentValue;
-
-                        if (var.currentValue != var.lastValue)
-                        {
-                            lvi.ForeColor = System.Drawing.Color.Red;
-                            // if this is a pointer, and it has changed, 
-                            //   we need to also find a new value for the value pointed to, if it's currently displayed
-                            if (var.isPointer)
-                            {
-                                // get the indirected value of this pointer
-                                ushort indAddr = 0;
-                                if (ushort.TryParse(var.currentValue, out indAddr))
-                                {
-                                    // if it's currently displayed it will be in the list
-                                    var indirect = Variables.Find(x => x.Name == "*" + var.Name);
-                                    if (indirect != null)
-                                    {
-                                        indirect.Address = indAddr;
-                                      //  indirect.GetValue(null);
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            lvi.ForeColor = System.Drawing.Color.Black;
-                        }
-                        var.lastValue = var.currentValue;
                     }
                     else
                     {
-                        //lvi.Text = "  " + lvi.Text;
-                        lvi.BackColor = System.Drawing.Color.Beige;
+                        lvi.ForeColor = System.Drawing.Color.Black;
                     }
+                    var.lastValue = var.currentValue;
 
+                }
             }
         }
-        //delegate void varViewDelegate2();
-        //void UpdateVariableWindow()
-        //{
-        //    if (varView.InvokeRequired)
-        //    {
-        //        varViewDelegate2 d = new varViewDelegate2(UpdateVariableWindow);
-        //        varView.Invoke(d, new object[] { });
-        //    }
-        //    else
-        //    {
-
-        //        foreach (Variable var in Variables)
-        //        {
-        //            ListView.ListViewItemCollection vars = varView.Items;
-        //            ListViewItem[] lvis = vars.Find(var.Name, false);
-        //            if (lvis == null || lvis.Length == 0)
-        //                continue;
-        //            ListViewItem lvi = lvis[0];
-
-        //            //if (var.Address != 0)
-        //            if (true)
-        //            {
-        //                lvi.SubItems[3].Text = var.currentValue;
-
-        //                if (var.Type.Name == "array")
-        //                {
-
-        //                }
-        //                else if (var.Type.Name == "pointer")
-        //                {
-        //                    // show address pointed to (in hex)
-        //                }
-
-        //            }
-        //            else
-        //            {
-        //                //lvi.Text = "  " + lvi.Text;
-        //                lvi.BackColor = System.Drawing.Color.Beige;
-        //            }
-        //        }
-        //    }
-        //}
 
 #else
         delegate void varViewDelegate();
@@ -1133,7 +1234,7 @@ namespace ArdDebug
                 ListView.ListViewItemCollection sourceItems = source.Items;
                 //int linecount = 0;
                 //bool lineFound = false;
-                if (currentBreakpoint != null)
+                if (currentBreakpoint != null && currentBreakpoint.SourceLine < source.Items.Count)
                 {
                     source.Items[currentBreakpoint.SourceLine].Selected = false;
                     currentBreakpoint.SourceLine = linenum;
@@ -1142,9 +1243,12 @@ namespace ArdDebug
                 {
                     currentBreakpoint = new Breakpoint("file", linenum);
                 }
-                source.Items[currentBreakpoint.SourceLine].Selected = true;
-                source.Select();
-                source.EnsureVisible(linenum);
+                if (currentBreakpoint.SourceLine < source.Items.Count)
+                {
+                    source.Items[currentBreakpoint.SourceLine].Selected = true;
+                    source.Select();
+                    source.EnsureVisible(linenum);
+                }
             }
 
         }

@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ArdDebug
@@ -14,37 +16,46 @@ namespace ArdDebug
         private Arduino _arduino;
         private string lastCommand = null;
         private List<string> responses;
+        private State state;
 
         public enum State : byte
         {
-            init, connected, typesFound, varsFound, funcsFound, main, newline, var
+            init, connected, typesFound, varsFound, funcsFound, setGlobals, ready, step,  getGlobals, getLocals, getArgs
         }
-        public State CurrentState { get; private set; }
+        public State CurrentState { get { return state; } }
+        public void SetState(State s) { state = s;  PromptReady = false; }
         public GDB(Arduino ard)
         {
             _arduino = ard;
             responses = new List<string>();
-            CurrentState = State.init;
+            SetState(State.init);
         }
         private Process AvrGdb;
 
         public class Interaction : EventArgs
         {
-            public enum Ev : byte
-            {
-                ready, newline, var
-            }
-            public Ev ev { get; set; }
+            //public enum Ev : byte
+            //{
+            //    ready, newline, dispvar, getvar, getlocal
+            //}
+            public State state { get; set; }
             public string var { get; set; }
             public int linenum { get; set; }
-            public Interaction(Ev ev)
+            public Interaction(State ev)
             {
-                this.ev = ev;
+                this.state = ev;
             }
         }
         public event InteractionHandler iHandler;
         public delegate void InteractionHandler(GDB m, Interaction e);
 
+        public bool PromptReady { get; set;  }
+
+        private string recdData = "";
+        private string[] lineEnd = { "\r\n" };
+
+        private string connection;
+        private string baud;
         public bool Open()
         {
             string elfPath = _arduino.FindElfPath();
@@ -62,26 +73,70 @@ namespace ArdDebug
             AvrGdb.StartInfo.RedirectStandardError = true;
 
             AvrGdb.ErrorDataReceived += AvrGdb_ErrorDataReceived;
-            AvrGdb.OutputDataReceived += AvrGdb_OutputDataReceived;
+           // AvrGdb.OutputDataReceived += AvrGdb_OutputDataReceived;
 
             AvrGdb.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
             AvrGdb.StartInfo.Arguments = elfPath;
+
+
+            connection = "target remote " + _arduino.spmanager.CurrentSerialSettings.PortName;
+            baud = "set serial baud " + _arduino.spmanager.CurrentSerialSettings.BaudRate;
 
             if (AvrGdb.Start()== false)
             {
                 MessageBox.Show("Cannot find 'avr-gdb.exe'");
                 return false;
             }
-            AvrGdb.BeginOutputReadLine();
+            //AvrGdb.BeginOutputReadLine();
             AvrGdb.BeginErrorReadLine();
 
-            
+            Task task = ConsumeOutput(AvrGdb.StandardOutput, s =>
+            {
+                recdData += s;
+                if (s.EndsWith("(gdb) "))
+                {
+                    string[] lines = recdData.Split(lineEnd, StringSplitOptions.RemoveEmptyEntries);
+                    for (int i=0; i < lines.Length; i++)
+                    {
+                        string str = lines[i];
+                        if (i == lines.Length-1)
+                        {
+                            PromptReady = true;
+                        }
+
+                         AvrGdb_OutputDataReceived(str);
+
+                    }
+                    recdData = string.Empty;
+                }
+
+            });
 
             //AvrGdb.WaitForExit();
             return true;
         }
-        //[DllImport("kernel32.dll", SetLastError = true)]
-        //static extern bool GenerateConsoleCtrlEvent(int sigevent, int dwProcessGroupId);
+
+        /// <summary>
+        /// thanks to http://stackoverflow.com/questions/33716580/process-output-redirection-on-a-single-console-line
+        /// </summary>
+        async Task ConsumeOutput(TextReader reader, Action<string> callback)
+        {
+            char[] buffer = new char[256];
+            int cch;
+
+            while ((cch = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                callback(new string(buffer, 0, cch));
+            }
+        }
+
+
+        public void Kill()
+        {
+            if (AvrGdb.HasExited == false)
+                AvrGdb.Kill();
+        }
+
         public bool Write(string line)
         {
 
@@ -102,7 +157,7 @@ namespace ArdDebug
                      CtrlC.StartInfo.RedirectStandardError = true;
 
                     CtrlC.ErrorDataReceived += AvrGdb_ErrorDataReceived;
-                    CtrlC.OutputDataReceived += AvrGdb_OutputDataReceived;
+                    //CtrlC.OutputDataReceived += AvrGdb_OutputDataReceived;
                     if (CtrlC.Start() == false)
                     {
                         MessageBox.Show("Cannot find 'SendCtrlC.exe'");
@@ -116,9 +171,11 @@ namespace ArdDebug
                 }
                 else
                 {
+                  //  PromptReady = false;
                     _arduino.UpdateCommsBox(line, true);
                     AvrGdb.StandardInput.WriteLine(line);
                     lastCommand = line;
+
                 }
                 return true;
 
@@ -133,15 +190,16 @@ namespace ArdDebug
 
         static StringBuilder outData = new StringBuilder();
         static StringBuilder errData = new StringBuilder();
-        private void AvrGdb_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        //private void AvrGdb_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        private void AvrGdb_OutputDataReceived(string reply)
         {
             lock (outData)
             {
-                string connection = "target remote " + _arduino.spmanager.CurrentSerialSettings.PortName;
-                string baud = "set serial baud " + _arduino.spmanager.CurrentSerialSettings.BaudRate;
-                string reply = e.Data;
-                if (reply == null)
-                    return;
+                //string connection = "target remote " + _arduino.spmanager.CurrentSerialSettings.PortName;
+                //string baud = "set serial baud " + _arduino.spmanager.CurrentSerialSettings.BaudRate;
+                //string reply = e.Data;
+                //if (reply == null)
+                //    return;
                 _arduino.UpdateCommsBox(reply, false);
 
                 if (CurrentState == State.init)
@@ -157,7 +215,7 @@ namespace ArdDebug
                     if (reply.Contains("Remote debugging"))
                     {
                         // can start to collect variable  types
-                        CurrentState = State.connected;
+                        SetState(State.connected);
                         AvrGdb.StandardInput.WriteLine("info types");
                     }
                 }
@@ -186,7 +244,7 @@ namespace ArdDebug
                             // this is the last useful line in the list of types, so parse them
                             ParseTypes();
                             responses.Clear();
-                            CurrentState = State.typesFound;
+                            SetState(State.typesFound);
                             // go on to read variables
                             AvrGdb.StandardInput.WriteLine("info variables");
                         }
@@ -195,7 +253,7 @@ namespace ArdDebug
                             // this is the last useful line in the list of variables, so parse them
                             ParseVariables();
                             responses.Clear();
-                            CurrentState = State.varsFound;
+                            SetState(State.varsFound);
                             AvrGdb.StandardInput.WriteLine("info functions");
                         }
                         else if (CurrentState < State.funcsFound)
@@ -203,11 +261,10 @@ namespace ArdDebug
                             // this is the last useful line in the list of variables, so parse them
                             ParseFunctions();
                             responses.Clear();
-                            CurrentState = State.funcsFound;
-                            Interaction ready = new Interaction(Interaction.Ev.ready);
+                            SetState(State.setGlobals);
+                            Interaction ready = new Interaction(State.setGlobals);
                             iHandler(this, ready);
-                           // AvrGdb.StandardInput.WriteLine("step");
-                           // _arduino.GDBReady();
+
                         }
                     }
 
@@ -216,36 +273,62 @@ namespace ArdDebug
                 {
                     // startup completed.
                     // remove the prompt before parsing rest of input
-                    reply = reply.Replace("(gdb)", "");
+                    // reply = reply.Replace("(gdb)", "");
                     char[] delimiters = new char[] { ' ', '\t' };
                     string[] parts = reply.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 2)
+                    if (parts.Length > 1 || PromptReady)
                     {
-
-                        int linenum = 0;
-                        if (parts[0].StartsWith("$"))
-                        {
-                            // result from a 'print variable' request
-                            //Arduino.resultEvent.Set();
-                            Interaction varReq = new Interaction(Interaction.Ev.var);
-                            varReq.var = "";
-                            for (int part = 2; part < parts.Length; part++)
-                                varReq.var += parts[part];
-                            iHandler(this, varReq);
-                           // _arduino.GDBValue(parts[2]);
-                        }
-                        
-                        else if (int.TryParse(parts[0], out linenum))
-                        {
-                            if (CurrentState < State.main)
-                            {
-                                CurrentState = State.main;
-
-                            }
-                            Interaction newLine = new Interaction(Interaction.Ev.newline);
-                            newLine.linenum = linenum;
-                            iHandler(this, newLine);
-                            //_arduino.GDBLine(linenum);
+                        Interaction i = null;
+                        switch (CurrentState) {
+                            case State.setGlobals:
+                                // just telling gdb which vars we want to display in future; not interested in values yet
+                                i = new Interaction(State.setGlobals);
+                                iHandler(this, i);
+                                break;
+                            case State.getLocals:
+                                // locals are returned simply like this "a = 3"
+                                i = new Interaction(State.getLocals);
+                                i.var = reply;
+                                iHandler(this, i);
+                                break;
+                            case State.getArgs:
+                                // locals are returned simply like this "a = 3"
+                                i = new Interaction(State.getArgs);
+                                i.var = reply;
+                                iHandler(this, i);
+                                break;
+                            case State.getGlobals:
+                                i = new Interaction(State.getGlobals);
+                                if (PromptReady)
+                                {
+                                    iHandler(this, i);
+                                    break;
+                                }
+                                if (parts[0].EndsWith(":"))
+                                {
+                                    // return of a variable value
+                                    
+                                    i.var = "";
+                                    for (int part = 1; part < parts.Length; part++)
+                                        i.var += parts[part];
+                                    iHandler(this, i);
+                                }
+                                break;
+                            case State.step:
+                                i = new Interaction(State.step);
+                                if (PromptReady)
+                                {
+                                    iHandler(this, i);
+                                    break;
+                                }
+                                int linenum = 0;
+                                if (int.TryParse(parts[0], out linenum))
+                                {
+                                    
+                                    i.linenum = linenum;
+                                    iHandler(this, i);
+                                }
+                                break;
                         }
                     }
                 }
@@ -337,10 +420,11 @@ namespace ArdDebug
                 else if (line.Length > 1)
                 {
                     Variable var = new Variable(_arduino);
+                    var.isGlobal = true;
                     char[] delimiters = new char[] { ' ', ';' };
                     string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                    //if (parts.Length < 3)
-                    //    continue;
+                    if (parts.Length < 2)
+                        continue;
                     
                     var.File = currentFile;
                     _arduino.AddVariable(var,parts);
@@ -361,7 +445,8 @@ namespace ArdDebug
                 {
                     char[] delimiters = new char[] { ' ', ':', '/' };
                     string[] parts = line.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                    currentFile = parts[parts.Length - 1];
+                    if (parts.Length > 0)
+                        currentFile = parts[parts.Length - 1];
                 }
                 else if (line.Contains("All defined functions"))
                 {
@@ -384,10 +469,12 @@ namespace ArdDebug
                     Function func = new ArdDebug.Function(_arduino);
                     char[] delimiters = new char[] { ' ', ';' };
                     string[] parts = shortFunc.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-
-                    func.Name = parts[parts.Length - 1];
+                    if (parts.Length > 0)
+                        func.Name = parts[parts.Length - 1];
                     func.File = currentFile;
-                    string typeName = parts[parts.Length - 2];
+                    //if (parts.Length > 1)
+                    //    // string typeName = parts[parts.Length - 2];
+                    //    func.Type.Name = parts[parts.Length - 2];
                     _arduino.AddFunction(func);
 
                 }

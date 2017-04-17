@@ -270,15 +270,20 @@ namespace ArdDebug
  
             ListViewItem lvi = new ListViewItem();
             lvi.Name = Name.ToString();
-            lvi.Text = Name.ToString();
-            if (Type == null)
+            
+            if (isArray || isStruct || isPointer)
+            {
+                lvi.Text = "+";
+            }
+            if (Type == null && isGlobal)
             {
                 MessageBox.Show("error parsing variables..." + Name + " has no type");
                 // var = null;
                 return null;
             }
-            string typeName = Type.Name;
+
 #if !__GDB__
+                      string typeName = Type.Name;
             if (Type.BaseType != null)
             {
                 // array type etc
@@ -296,6 +301,7 @@ namespace ArdDebug
             //lvi.SubItems.Add(typeName);
             //lvi.SubItems.Add(Address.ToString("X"));
             //if (Address != 0)
+            lvi.SubItems.Add(Name);
             lvi.SubItems.Add(currentValue);
  
             return lvi;

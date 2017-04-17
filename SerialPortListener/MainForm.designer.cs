@@ -40,6 +40,7 @@
             this.buttonRun = new System.Windows.Forms.Button();
             this.buttonStep = new System.Windows.Forms.Button();
             this.varView = new System.Windows.Forms.ListView();
+            this.columnExpander = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnValue = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.labelSketch = new System.Windows.Forms.Label();
@@ -120,8 +121,8 @@
             // commsData
             // 
             this.commsData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.commsData.Font = new System.Drawing.Font("Courier New", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.commsData.Location = new System.Drawing.Point(518, 463);
+            this.commsData.Font = new System.Drawing.Font("Lucida Console", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.commsData.Location = new System.Drawing.Point(514, 389);
             this.commsData.Multiline = true;
             this.commsData.Name = "commsData";
             this.commsData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -163,6 +164,7 @@
             this.varView.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.varView.BackColor = System.Drawing.SystemColors.GradientInactiveCaption;
             this.varView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
+            this.columnExpander,
             this.columnName,
             this.columnValue});
             this.varView.GridLines = true;
@@ -170,21 +172,25 @@
             this.varView.Location = new System.Drawing.Point(519, 45);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(227, 384);
-            this.varView.Sorting = System.Windows.Forms.SortOrder.Ascending;
+            this.varView.Size = new System.Drawing.Size(227, 310);
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             this.varView.View = System.Windows.Forms.View.Details;
             // 
+            // columnExpander
+            // 
+            this.columnExpander.Text = "";
+            this.columnExpander.Width = 15;
+            // 
             // columnName
             // 
             this.columnName.Text = "Variable";
-            this.columnName.Width = 90;
+            this.columnName.Width = 80;
             // 
             // columnValue
             // 
             this.columnValue.Text = "Value";
-            this.columnValue.Width = 130;
+            this.columnValue.Width = 125;
             // 
             // labelSketch
             // 
@@ -201,13 +207,13 @@
             this.columnBP,
             this.columnLineNum,
             this.columnLine});
-            this.sourceView.Font = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.sourceView.Font = new System.Drawing.Font("Lucida Console", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
             this.sourceView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.sourceView.Location = new System.Drawing.Point(3, 48);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(502, 619);
+            this.sourceView.Size = new System.Drawing.Size(502, 560);
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -244,11 +250,11 @@
             this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
             this.columnText});
-            this.disassemblyView.Font = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.disassemblyView.Font = new System.Drawing.Font("Lucida Console", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.disassemblyView.FullRowSelect = true;
             this.disassemblyView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.disassemblyView.HideSelection = false;
-            this.disassemblyView.Location = new System.Drawing.Point(3, 477);
+            this.disassemblyView.Location = new System.Drawing.Point(3, 399);
             this.disassemblyView.MultiSelect = false;
             this.disassemblyView.Name = "disassemblyView";
             this.disassemblyView.Size = new System.Drawing.Size(502, 209);
@@ -327,10 +333,6 @@
             this.buttonReload.UseVisualStyleBackColor = true;
             this.buttonReload.Click += new System.EventHandler(this.buttonReload_Click);
             // 
-            // timer1
-            // 
-            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
-            // 
             // buttonFunctions
             // 
             this.buttonFunctions.Location = new System.Drawing.Point(87, 8);
@@ -348,21 +350,21 @@
             this.panel1.Controls.Add(this.groupBox1);
             this.panel1.Controls.Add(this.buttonComms);
             this.panel1.Controls.Add(this.buttonDiss);
-            this.panel1.Location = new System.Drawing.Point(523, 597);
+            this.panel1.Location = new System.Drawing.Point(519, 523);
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(222, 89);
             this.panel1.TabIndex = 32;
             // 
             // textBoxInput
             // 
-            this.textBoxInput.Location = new System.Drawing.Point(518, 437);
+            this.textBoxInput.Location = new System.Drawing.Point(520, 361);
             this.textBoxInput.Name = "textBoxInput";
             this.textBoxInput.Size = new System.Drawing.Size(133, 20);
             this.textBoxInput.TabIndex = 33;
             // 
             // buttonSend
             // 
-            this.buttonSend.Location = new System.Drawing.Point(672, 435);
+            this.buttonSend.Location = new System.Drawing.Point(664, 361);
             this.buttonSend.Name = "buttonSend";
             this.buttonSend.Size = new System.Drawing.Size(75, 23);
             this.buttonSend.TabIndex = 34;
@@ -375,7 +377,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.ClientSize = new System.Drawing.Size(757, 687);
+            this.ClientSize = new System.Drawing.Size(757, 615);
             this.Controls.Add(this.buttonSend);
             this.Controls.Add(this.textBoxInput);
             this.Controls.Add(this.panel1);
@@ -439,6 +441,7 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.TextBox textBoxInput;
         private System.Windows.Forms.Button buttonSend;
+        private System.Windows.Forms.ColumnHeader columnExpander;
     }
 }
 

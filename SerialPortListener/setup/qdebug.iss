@@ -36,6 +36,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "C:\Users\chris\Documents\GitHub\avrdebug\SerialPortListener\SerialPortListener\bin\Release\ArdDebug.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\chris\Documents\GitHub\avrdebug\SerialPortListener\SerialPortListener\bin\Debug\avr-objdump.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\chris\Documents\GitHub\avrdebug\SerialPortListener\SerialPortListener\bin\Debug\avr-gdb.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

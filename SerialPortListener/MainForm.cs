@@ -108,12 +108,20 @@ namespace ArdDebug
 
         private void buttonPause_Click(object sender, EventArgs e)
         {
+#if __GDB__
+            Arduino.NewCommand("break");
+#else
             Arduino._Running.CancelAsync();
             //Arduino.pauseReqd = true;
+#endif
         }
         private void buttonStep_Click(object sender, EventArgs e)
         {
+#if __GDB__
+            Arduino.NewCommand("step");
+#else
             Arduino.SingleStep();
+#endif
         }
 
 
