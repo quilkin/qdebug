@@ -171,7 +171,7 @@ namespace ArdDebug
                 }
                 else
                 {
-                  //  PromptReady = false;
+                    PromptReady = false;
                     _arduino.UpdateCommsBox(line, true);
                     AvrGdb.StandardInput.WriteLine(line);
                     lastCommand = line;
@@ -327,6 +327,12 @@ namespace ArdDebug
                                     
                                     i.linenum = linenum;
                                     iHandler(this, i);
+                                }
+                                else
+                                {
+                                    // not sure about this.....
+                                    iHandler(this, i);
+                                    break;
                                 }
                                 break;
                         }

@@ -27,6 +27,15 @@ namespace ArdDebug
         private List<Breakpoint> Breakpoints = new List<Breakpoint>();
         private List<Variable> Variables = new List<Variable>();
         private List<Variable> MyVariables = new List<Variable>();
+
+#if __GDB__
+        private List<Variable> LocalVariables = new List<Variable>();
+        private List<Variable> PrevLocalVariables = new List<Variable>();
+        private List<Variable> ArgVariables = new List<Variable>();
+        private List<Variable> PrevArgVariables = new List<Variable>();
+#else
+
+#endif
         private List<VariableType> VariableTypes = new List<VariableType>();
         private List<Function> Functions = new List<Function>();
 
@@ -138,6 +147,7 @@ namespace ArdDebug
             if (input == "step")
             {
                 gdb.SetState(GDB.State.step);
+                GUI.RunButtons(false);
             }
 
             gdb.Write(input);
@@ -200,115 +210,123 @@ namespace ArdDebug
 
         private void GotResponse(GDB gdb, GDB.Interaction e)
         {
-            if (e.state == GDB.State.setGlobals)
+            Variable var;
+            string[] parts;
+            switch (e.state)
             {
-                if (currentVariable >= 0 && currentVariable < Variables.Count)
-                {
-                    Variable var = Variables[currentVariable];
-                    DisplayNextVariable();
-                }
-                else
-                {
-                    // dealt with all the vars, can start debugging
-                    gdb.SetState(GDB.State.ready);
-                    GDBReady();
-                    //     NewCommand("step");
-                }
-            }
-            else if (e.state == GDB.State.getGlobals)
-            {
-                if (gdb.PromptReady)
-                {
-                    // got all globals; ask for any locals
-                    gdb.SetState(GDB.State.getLocals);
-                    NewCommand("info locals");
-                    return;
-                }
-                // e.var contains something like "var=3" or "var={3,4,5}"
-                string[] parts = e.var.Split('=');
-                Variable var = Variables.Find(x => parts[0] == x.Name);
-                if (var != null)
-                {
+                case GDB.State.setGlobals:
+
+                    if (currentVariable >= 0 && currentVariable < Variables.Count)
+                    {
+                        var = Variables[currentVariable];
+                        DisplayNextVariable();
+                    }
+                    else
+                    {
+                        // dealt with all the vars, can start debugging
+                        gdb.SetState(GDB.State.ready);
+                        GDBReady();
+                    }
+                    break;
+
+                case GDB.State.getGlobals:
+
+                    if (gdb.PromptReady)
+                    {
+                        // got all globals; ask for any locals
+                        gdb.SetState(GDB.State.getLocals);
+                        NewCommand("info locals");
+                        return;
+                    }
+                    // e.var contains something like "var=3" or "var={3,4,5}"
+                    parts = e.var.Split('=');
+                    var = Variables.Find(x => parts[0] == x.Name);
+                    if (var != null)
+                    {
+                        var.currentValue = parts[1];
+                        UpdateVariableInWindow(var);
+                    }
+                    break;
+
+                case GDB.State.getLocals:
+
+                    if (e.var.Contains("No locals"))
+                    {
+                        LocalVariables.Clear();
+                        NewCommand("info args");
+                        return;
+                    }
+                    if (gdb.PromptReady)
+                    {
+                        UpdateLocals();
+                        gdb.SetState(GDB.State.getArgs);
+                        NewCommand("info args");
+                        return;
+                    }
+                    // e.var contains something like "var=3" or "var={3,4,5}"
+                    parts = e.var.Split('=');
+                    if (parts.Length < 2)
+                        return;
+                    // locals won't be in the list of variables
+                    var = new Variable(this);
+                    var.Name = parts[0];
                     var.currentValue = parts[1];
-                    UpdateVariableInWindow(var);
-                }
-
-            }
-            else if (e.state == GDB.State.getLocals)
-            { 
-                if (e.var.Contains("No locals"))
-                {
-                    NewCommand("info args");
-                    return;
-                }
-                if (gdb.PromptReady)
-                {
-                    gdb.SetState(GDB.State.getArgs);
-                    NewCommand("info args");
-                    return;
-                }
-                // e.var contains something like "var=3" or "var={3,4,5}"
-                string[] parts = e.var.Split('=');
-                // locals won't be in the list of variables
-                Variable var = new Variable(this);
-                var.Name = parts[0];
-                var.currentValue = parts[1];
-                var.isGlobal = false;
-                UpdateVariableInWindow(var);
+                    var.isGlobal = false;
+                    LocalVariables.Add(var);
+                    //UpdateVariableInWindow(var);
+                    break;
 
 
-            }
-            else if (e.state == GDB.State.getArgs)
-            {
-                if (e.var.Contains("No arguments"))
-                {
-                    return;
-                }
-                if (gdb.PromptReady)
-                {
-                    return;
-                    // wait for new command from user
-                }
-                // e.var contains something like "var=3" or "var={3,4,5}"
-                string[] parts = e.var.Split('=');
-                // locals won't be in the list of variables
-                Variable var = new Variable(this);
-                var.Name = parts[0];
-                var.currentValue = parts[1];
-                var.isGlobal = false;
-                UpdateVariableInWindow(var);
+                case GDB.State.getArgs:
+
+                    if (e.var.Contains("No arguments"))
+                    {
+                        ArgVariables.Clear();
+                        gdb.SetState(GDB.State.ready);
+                        GUI.RunButtons(true);
+                        return;
+                    }
+                    if (e.var.Contains("No symbol table"))
+                    {
+                        gdb.SetState(GDB.State.ready);
+                        GUI.RunButtons(true);
+                        return;
+                    }
+                    if (gdb.PromptReady)
+                    {
+                        UpdateArgs();
+                        gdb.SetState(GDB.State.ready);
+                        GUI.RunButtons(true);
+                        return;
+                        // wait for new command from user
+                    }
+                    // e.var contains something like "var=3" or "var={3,4,5}"
+                    parts = e.var.Split('=');
+                    // locals won't be in the list of variables
+                    var = new Variable(this);
+                    var.Name = parts[0];
+                    var.currentValue = parts[1];
+                    var.isGlobal = false;
+                    ArgVariables.Add(var);
+                    //UpdateVariableInWindow(var);
+                    break;
 
 
-            }
-            else if (e.state == GDB.State.step)
-            {
-                if (gdb.PromptReady)
-                {
-                    return;
-                    // wait for new command from user
-                }
-                UpdateSource(e.linenum - 1);
-                //if (gdb.PromptReady)
-                {
-                    gdb.SetState(GDB.State.getGlobals);
-                }
-                    // every line, we need to see what any local vars are doing
+                case GDB.State.step:
 
-                    //// wait for locals to come back. This is  acrude way of doing it, but don't know how many there will be...
-                    //System.Timers.Timer t = new System.Timers.Timer(100);
-                    //t.Elapsed += getArgs;
-                    //t.AutoReset = false;
-                    //t.Start();
+                    if (gdb.PromptReady)
+                    {
+                        return;
+                        // wait for new command from user
+                    }
+                    UpdateSource(e.linenum - 1);
+                    //if (gdb.PromptReady)
+                    {
+                        gdb.SetState(GDB.State.getGlobals);
+                    }
+                    break;
 
-                }
-            //else if (e.state == GDB.State.ready)
-            //{
-            //    GDBReady();
-            //    // start to tell GDB what variables to display
-            //    gdb.SetState(GDB.State.getGlobals);
-            //    currentVariable = 0;
-            //    DisplayNextVariable();
-            //}
+               }
         }
 
 #endif
@@ -325,6 +343,10 @@ namespace ArdDebug
             varView.Items.Clear();
             Variables.Clear();
             MyVariables.Clear();
+            LocalVariables.Clear();
+            PrevLocalVariables.Clear();
+            ArgVariables.Clear();
+            PrevArgVariables.Clear();
             Functions.Clear();
 
             gdb = new GDB(this);
@@ -355,7 +377,10 @@ namespace ArdDebug
 #endif
         }
 
-
+#if __GDB__
+        public void FindBreakpoint() { }
+        public void StepOver() { }
+#else
         delegate Function FindFuncDelegate();
         /// <summary>
         /// See if this line calls a  function; if so is it one of ours?
@@ -584,59 +609,8 @@ namespace ArdDebug
         }
 
 
-#if __GDB__
 
-
-
-        public void GetVariables()
-        {
-
-            //// first see if we need to also get local variables
-            Function func = null;
-            //if (currentBreakpoint != null)
-            //{
-            //    UInt16 progCounter = currentBreakpoint.ProgramCounter;
-                
-            //    foreach (Function f in Functions)
-            //    {
-            //        if (f.IsMine)
-            //        {
-            //            if (f.HighPC > progCounter && f.LowPC <= progCounter)
-            //            {
-            //                // we are currently 'in' this function
-            //                func = f;
-            //                break;
-            //            }
-            //        }
-
-            //    }
-            //}
-
-            //foreach (Variable var in Variables)
-            //{
-            //    if (func != null)
-            //    {
-            //        if (var.Function != func)
-            //        {
-            //            // We are not in the same function where this variable is used
-            //            continue;
-            //        }
-            //    }
-            //    if (var.File == ShortFilename)
-            //    {
-            //        // send request to GDB
-            //        currentVariable = var;
-            //        NewCommand("print " + var.Name);
-            //        // wait for reply
-            //        //resultEvent.WaitOne();
-            //    }
-
- 
-            //}
-
-        }
-#else
-                public void GetVariables()
+         public void GetVariables()
         {
 
             //// first see if we need to also get local variables
@@ -966,6 +940,90 @@ namespace ArdDebug
             return false;
         }
 
+
+        private void UpdateLocals()
+        {
+            bool varsNeedDeleting = false;
+            int varCount = LocalVariables.Count;
+            if (varCount == 0)
+            {
+                varsNeedDeleting = true;
+            }
+            else
+            {
+                for (int v = 0; v < varCount; v++)
+                {
+                    if (PrevLocalVariables.Count < 1 + v )
+                    {
+                        break;
+                    }
+                    Variable var = LocalVariables[v];
+                    if (var.Name != PrevLocalVariables[v].Name)
+                    {
+                        // at least one name has changed so this is a new function
+                        varsNeedDeleting = true;
+                        break;
+                    }
+                }
+            }
+            if (varsNeedDeleting)
+            {
+                foreach (Variable var in PrevLocalVariables)
+                {
+                    var.isMine = false;
+                    UpdateVariableInWindow(var);
+                }
+            }
+            PrevLocalVariables.Clear();
+            foreach (Variable var in LocalVariables)
+            {
+                var.isMine = true;
+                UpdateVariableInWindow(var);
+                PrevLocalVariables.Add(var);
+            }
+        }
+
+        private void UpdateArgs()
+        {
+            bool varsNeedDeleting = false;
+            int varCount = ArgVariables.Count;
+            if (varCount == 0)
+            {
+                varsNeedDeleting = true;
+            }
+            else
+            {
+                for (int v = 0; v < varCount; v++)
+                {
+                    if (PrevArgVariables.Count < 1 + v)
+                    {
+                        break;
+                    }
+                    Variable var = ArgVariables[v];
+                    if (var.Name != PrevArgVariables[v].Name)
+                    {
+                        // at least one name has changed so this is a new function
+                        varsNeedDeleting = true;
+                        break;
+                    }
+                }
+            }
+            if (varsNeedDeleting)
+            {
+                foreach (Variable var in PrevArgVariables)
+                {
+                    var.isMine = false;
+                    UpdateVariableInWindow(var);
+                }
+            }
+            PrevArgVariables.Clear();
+            foreach (Variable var in ArgVariables)
+            {
+                var.isMine = true;
+                UpdateVariableInWindow(var);
+                PrevArgVariables.Add(var);
+            }
+        }
 #if __GDB__
         delegate void varViewDelegate(Variable var);
         void UpdateVariableInWindow(Variable var)
@@ -980,14 +1038,19 @@ namespace ArdDebug
                 ListViewItem lvi;
 
                 ListView.ListViewItemCollection vars = varView.Items;
-                    ListViewItem[] lvis = vars.Find(var.Name, false);
+                ListViewItem[] lvis = vars.Find(var.Name, false);
 
 
                 if (lvis == null || lvis.Length == 0)
                 {
                     if (var.isGlobal == false)
                     {
+
                         lvi = var.CreateVarViewItem();
+                        if (var.currentValue == " <optimized out>")
+                        {
+                            var.currentValue = "Unavailable";
+                        }
                         lvi.SubItems[1].Text = "  " + lvi.SubItems[1].Text;
                         lvi.BackColor = System.Drawing.Color.Beige;
                         varView.Items.Insert(varView.Items.Count, lvi);
@@ -1000,7 +1063,40 @@ namespace ArdDebug
                 {
                     lvi = lvis[0];
                 }
+                if (var.isGlobal== false && var.isMine == false)
+                {
+                    // needs removing from list
+                    varView.Items.Remove(lvi);
+                    return;
+                }
+                if (var.currentValue.Contains('\\'))
+                {
+                    if (var.Type.Name == "char")
+                    {
+                        // convert from octal
+                        // may be an array "\000\000\000....." or just a single value
+                        char[] delimiters = new char[] { '\\', '"' };
+                        string[] octals = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                        string newString = "{";
+                        foreach (string octal in octals)
+                        {
+                            if (octal.Length == 3)
+                            {
+                                int val = octal[0] - '0';
+                                val = val << 3 + (octal[1] - '0');
+                                val = val << 3 + (octal[2] - '0');
+                                newString += val;
+                                if (val >= 32 && val < 127)
+                                    newString += '(' + (char)val + ')';
+                                newString += ',';
+                            }
+                            
+                        }
+                        newString += '}';
+                        var.currentValue = newString;
 
+                    }
+                }
                 lvi.SubItems[2].Text = var.currentValue;
 
                 if (var.currentValue != var.lastValue)
@@ -1221,6 +1317,8 @@ namespace ArdDebug
         delegate void updateSourceDelegate(int linenum);
         void UpdateSource(int linenum)
         {
+            if (linenum < 0)
+                return;
             if (source.InvokeRequired)
             {
                 updateSourceDelegate d = new updateSourceDelegate(UpdateSource);

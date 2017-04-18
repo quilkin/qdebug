@@ -177,10 +177,31 @@ namespace ArdDebug
 
 
             }
+            Process[] arduinos = Process.GetProcessesByName("javaw");
+            bool arduinoRunning = false;
+            foreach (Process p in arduinos)
+            {
+                if (p.MainWindowTitle.Contains("Arduino"))
+                    arduinoRunning = true;
+            }
+            if (!arduinoRunning)
+            {
+                MessageBox.Show("Arduino IDE must be running and your sketch rebuilt");
+                return null;
+            }
+            
             if (elfPath == null)
             {
-                MessageBox.Show("No compiled files found. You may need to recompile your project");
+                MessageBox.Show("No compiled files found. You may need to rebuild your project");
                 return null;
+            }
+            DateTime elfDate = File.GetLastWriteTime(elfPath);
+            TimeSpan howOld = DateTime.Now - elfDate;
+            if (howOld.Hours > 12)
+            {
+                MessageBox.Show("Compiled files may be out-of-date. Please rebuild your project");
+                return null;
+
             }
             // in case path includes spces, argument needs quotes
             elfPath = "\"" + elfPath + "\"";
