@@ -39,12 +39,11 @@ namespace ArdDebug
         private List<VariableType> VariableTypes = new List<VariableType>();
         private List<Function> Functions = new List<Function>();
 
-        /// <summary>
-        /// where program counter is currently sitting
-        /// </summary>
-        public Breakpoint currentBreakpoint { private set; get; }
-        public int currentVariable{ private set; get; }
 
+        public Breakpoint currentBreakpoint { private set; get; }
+        public int MaxBreakpoints = 4;
+        public int currentVariable{ private set; get; }
+        public int currentLine = -1;
         /// <summary>
         /// next place to stop if we skip over a function call
         /// </summary>
@@ -172,6 +171,7 @@ namespace ArdDebug
                 //MessageBox.Show(string.Format("Found {0} variables and {1} functions", Variables.Count, Functions.Count));
                 GUI.RunButtons(true);
                 varView.Enabled = true;
+                source.Enabled = true;
                 foreach (Variable var in Variables)
                 {
                     if (var.File == this.ShortFilename)
@@ -182,6 +182,7 @@ namespace ArdDebug
                     }
                 }
                 gdb.PromptReady = false;
+                GUI.StopTimer();
             }
 
         }
@@ -313,19 +314,40 @@ namespace ArdDebug
 
 
                 case GDB.State.step:
+                case GDB.State.next:
+                case GDB.State.run:
+                case GDB.State.stepout:
 
                     if (gdb.PromptReady)
                     {
                         return;
                         // wait for new command from user
                     }
+
                     UpdateSource(e.linenum - 1);
                     //if (gdb.PromptReady)
                     {
                         gdb.SetState(GDB.State.getGlobals);
                     }
                     break;
-
+                case GDB.State.breakpoint:
+                    if (gdb.PromptReady)
+                    {
+                        return;
+                        // wait for new command from user
+                    }
+                    if (e.var.StartsWith("Deleted"))
+                    {
+                        Breakpoints.Remove(currentBreakpoint);
+                    }
+                    else if (e.var.StartsWith("Breakpoint"))
+                    {
+                        Breakpoints.Add(currentBreakpoint);
+                    }
+                    break;
+                default:
+                    MessageBox.Show("Unknown state: " + e.state, "Error");
+                    break;
                }
         }
 
@@ -378,8 +400,22 @@ namespace ArdDebug
         }
 
 #if __GDB__
-        public void FindBreakpoint() { }
-        public void StepOver() { }
+        public void FindBreakpoint()
+        {
+            GUI.RunButtons(false);
+            gdb.SetState(GDB.State.run);
+            NewCommand("continue");
+        }
+        public void StepOver()
+        {
+            gdb.SetState(GDB.State.next);
+            NewCommand("next");
+        }
+        public void StepOut()
+        {
+            gdb.SetState(GDB.State.stepout);
+            NewCommand("finish");
+        }
 #else
         delegate Function FindFuncDelegate();
         /// <summary>
@@ -1083,8 +1119,8 @@ namespace ArdDebug
                             if (octal.Length == 3)
                             {
                                 int val = octal[0] - '0';
-                                val = val << 3 + (octal[1] - '0');
-                                val = val << 3 + (octal[2] - '0');
+                                val = (val << 3) + (octal[1] - '0');
+                                val = (val << 3) + (octal[2] - '0');
                                 newString += val;
                                 if (val >= 32 && val < 127)
                                     newString += '(' + (char)val + ')';
@@ -1328,25 +1364,39 @@ namespace ArdDebug
             {
                 if (source == null)
                     return;
-                // find the line that contains the current breakpoint
-                ListView.ListViewItemCollection sourceItems = source.Items;
-                //int linecount = 0;
-                //bool lineFound = false;
-                if (currentBreakpoint != null && currentBreakpoint.SourceLine < source.Items.Count)
+                if (currentLine > 0 && currentLine < source.Items.Count)
                 {
-                    source.Items[currentBreakpoint.SourceLine].Selected = false;
-                    currentBreakpoint.SourceLine = linenum;
+                    source.Items[currentLine].Selected = false;
+
                 }
-                else
+
+                currentLine = linenum;
+
+                if (currentLine < source.Items.Count)
                 {
-                    currentBreakpoint = new Breakpoint("file", linenum);
-                }
-                if (currentBreakpoint.SourceLine < source.Items.Count)
-                {
-                    source.Items[currentBreakpoint.SourceLine].Selected = true;
+                    source.Items[currentLine].Selected = true;
                     source.Select();
                     source.EnsureVisible(linenum);
                 }
+                // find the line that contains the current breakpoint
+                // ListView.ListViewItemCollection sourceItems = source.Items;
+                //int linecount = 0;
+                //bool lineFound = false;
+                //if (currentBreakpoint != null && currentBreakpoint.SourceLine < source.Items.Count)
+                //{
+                //    source.Items[currentBreakpoint.SourceLine].Selected = false;
+                //    currentBreakpoint.SourceLine = linenum;
+                //}
+                //else
+                //{
+                //    currentBreakpoint = new Breakpoint("file", linenum);
+                //}
+                //if (currentBreakpoint.SourceLine < source.Items.Count)
+                //{
+                //    source.Items[currentBreakpoint.SourceLine].Selected = true;
+                //    source.Select();
+                //    source.EnsureVisible(linenum);
+                //}
             }
 
         }
@@ -1402,24 +1452,58 @@ namespace ArdDebug
             if (source.SelectedItems.Count == 0)
                 return;
             ListViewItem lvi = source.SelectedItems[0];
-            ListView.ListViewItemCollection sourceItems = source.Items;
+            //ListView.ListViewItemCollection sourceItems = source.Items;
+
+            lvi.Selected = false;
 
             // clear any previous breakpoints
-            foreach (Breakpoint bp in Breakpoints)
-            {
-                if (bp.Manual)
-                {
-                    bp.Manual = false;
-                    ListViewItem bpItem = sourceItems[bp.SourceLine - 1];
-                     bpItem.BackColor = sourceLineColour;
+            //foreach (Breakpoint bp in Breakpoints)
+            //{
+            //    if (bp.Manual)
+            //    {
+            //        bp.Manual = false;
+            //        ListViewItem bpItem = sourceItems[bp.SourceLine - 1];
+            //         bpItem.BackColor = sourceLineColour;
 
-                }
-            }
+            //    }
+            //}
 
             // set a new breakpoint (only 1 bp allowed for now....)
 
             if (lvi.BackColor == sourceLineColour) // i.e. breakpoint possible on this line
             {
+#if __GDB__
+                for (int b=0; b < Breakpoints.Count; b++)
+                {
+                    Breakpoint bp = Breakpoints[b];
+                    if (bp.SourceLine == lvi.Index + 1)
+                    {
+                        // already a bp here, remove it
+                        lvi.ImageIndex = -1;
+                        //Breakpoints.Remove(bp);
+                        gdb.SetState(GDB.State.breakpoint);
+                        currentBreakpoint = new Breakpoint(ShortFilename, lvi.Index + 1);
+                        NewCommand(string.Format("clear {0}:{1}", ShortFilename, lvi.Index + 1));
+                        // wait for resposne before removing bp from our own list
+                        return;
+                    }
+                }
+                if (Breakpoints.Count < MaxBreakpoints)
+                {
+                    lvi.ImageIndex = 0;
+                    //Breakpoints.Add(new Breakpoint(this.ShortFilename, lvi.Index + 1));
+                    gdb.SetState(GDB.State.breakpoint);
+                    currentBreakpoint = new Breakpoint(ShortFilename, lvi.Index + 1);
+                    NewCommand(string.Format("break {0}:{1}",ShortFilename,lvi.Index + 1));
+                    // wait for resposne before adding bp to our own list
+                }
+                else
+                {
+                    MessageBox.Show(string.Format("Only {0} breakpoints allowed", MaxBreakpoints));
+                }
+
+
+#else
                 // now need to find the correct (single-step) breakpoint and make it manual 
                 foreach (Breakpoint bp in Breakpoints)
                 {
@@ -1432,6 +1516,7 @@ namespace ArdDebug
 
                     }
                 }
+#endif
             }
             //else if (lvi.BackColor == breakpointColour || lvi.BackColor == breakpointHitColour) // i.e. breakpoint possible on this line
             //{
@@ -1511,25 +1596,25 @@ namespace ArdDebug
             return null;
         }
 
-        public void FunctionList()
-        {
-            if (Functions.Count == 0)
-                return;
-            string funcList = "";
-            foreach (Function func in Functions)
-            {
-                funcList += func.Name;
-                funcList += "\t";
-                funcList += func.fileRef;
-                if (func.IsMine)
-                    funcList += " *";
-                funcList += "\n";
-            }
+        //public void FunctionList()
+        //{
+        //    if (Functions.Count == 0)
+        //        return;
+        //    string funcList = "";
+        //    foreach (Function func in Functions)
+        //    {
+        //        funcList += func.Name;
+        //        funcList += "\t";
+        //        funcList += func.fileRef;
+        //        if (func.IsMine)
+        //            funcList += " *";
+        //        funcList += "\n";
+        //    }
             
-            MessageBox.Show(funcList,"Function List");
+        //    MessageBox.Show(funcList,"Function List");
             
 
-        }
+        //}
         
     }
 

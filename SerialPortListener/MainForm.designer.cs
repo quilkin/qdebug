@@ -29,6 +29,7 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.serialSettingsBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.portNameComboBox = new System.Windows.Forms.ComboBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
@@ -43,7 +44,6 @@
             this.columnExpander = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnValue = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.labelSketch = new System.Windows.Forms.Label();
             this.sourceView = new System.Windows.Forms.ListView();
             this.columnBP = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnLineNum = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -59,20 +59,26 @@
             this.panelRunning = new System.Windows.Forms.Panel();
             this.buttonReload = new System.Windows.Forms.Button();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
-            this.buttonFunctions = new System.Windows.Forms.Button();
             this.panel1 = new System.Windows.Forms.Panel();
             this.textBoxInput = new System.Windows.Forms.TextBox();
             this.buttonSend = new System.Windows.Forms.Button();
+            this.panel2 = new System.Windows.Forms.Panel();
+            this.buttonStepOut = new System.Windows.Forms.Button();
+            this.panelComms = new System.Windows.Forms.Panel();
+            this.buttonCloseComms = new System.Windows.Forms.Button();
+            this.imageList1 = new System.Windows.Forms.ImageList(this.components);
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).BeginInit();
             this.groupBox1.SuspendLayout();
             this.panel1.SuspendLayout();
+            this.panel2.SuspendLayout();
+            this.panelComms.SuspendLayout();
             this.SuspendLayout();
             // 
             // portNameComboBox
             // 
             this.portNameComboBox.DataBindings.Add(new System.Windows.Forms.Binding("Text", this.serialSettingsBindingSource, "PortName", true, System.Windows.Forms.DataSourceUpdateMode.OnPropertyChanged));
             this.portNameComboBox.FormattingEnabled = true;
-            this.portNameComboBox.Location = new System.Drawing.Point(6, 19);
+            this.portNameComboBox.Location = new System.Drawing.Point(10, 19);
             this.portNameComboBox.Name = "portNameComboBox";
             this.portNameComboBox.Size = new System.Drawing.Size(61, 21);
             this.portNameComboBox.TabIndex = 8;
@@ -81,16 +87,16 @@
             // 
             this.groupBox1.Controls.Add(this.buttonScan);
             this.groupBox1.Controls.Add(this.portNameComboBox);
-            this.groupBox1.Location = new System.Drawing.Point(3, 8);
+            this.groupBox1.Location = new System.Drawing.Point(3, 3);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(78, 76);
+            this.groupBox1.Size = new System.Drawing.Size(145, 50);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Connection";
             // 
             // buttonScan
             // 
-            this.buttonScan.Location = new System.Drawing.Point(6, 46);
+            this.buttonScan.Location = new System.Drawing.Point(78, 19);
             this.buttonScan.Name = "buttonScan";
             this.buttonScan.Size = new System.Drawing.Size(61, 23);
             this.buttonScan.TabIndex = 17;
@@ -100,7 +106,7 @@
             // 
             // btnStop
             // 
-            this.btnStop.Location = new System.Drawing.Point(672, 6);
+            this.btnStop.Location = new System.Drawing.Point(671, 3);
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(81, 23);
             this.btnStop.TabIndex = 12;
@@ -110,7 +116,8 @@
             // 
             // btnStart
             // 
-            this.btnStart.Location = new System.Drawing.Point(283, 4);
+            this.btnStart.Enabled = false;
+            this.btnStart.Location = new System.Drawing.Point(229, 3);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(76, 23);
             this.btnStart.TabIndex = 12;
@@ -122,18 +129,19 @@
             // 
             this.commsData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.commsData.Font = new System.Drawing.Font("Lucida Console", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.commsData.Location = new System.Drawing.Point(514, 389);
+            this.commsData.Location = new System.Drawing.Point(0, 36);
             this.commsData.Multiline = true;
             this.commsData.Name = "commsData";
             this.commsData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.commsData.Size = new System.Drawing.Size(227, 128);
+            this.commsData.Size = new System.Drawing.Size(241, 146);
             this.commsData.TabIndex = 13;
             // 
             // buttonPause
             // 
-            this.buttonPause.Location = new System.Drawing.Point(607, 5);
+            this.buttonPause.Enabled = false;
+            this.buttonPause.Location = new System.Drawing.Point(619, 3);
             this.buttonPause.Name = "buttonPause";
-            this.buttonPause.Size = new System.Drawing.Size(59, 23);
+            this.buttonPause.Size = new System.Drawing.Size(46, 23);
             this.buttonPause.TabIndex = 15;
             this.buttonPause.Text = "Pause";
             this.buttonPause.UseVisualStyleBackColor = true;
@@ -141,7 +149,7 @@
             // 
             // buttonRun
             // 
-            this.buttonRun.Location = new System.Drawing.Point(490, 5);
+            this.buttonRun.Location = new System.Drawing.Point(502, 3);
             this.buttonRun.Name = "buttonRun";
             this.buttonRun.Size = new System.Drawing.Size(55, 23);
             this.buttonRun.TabIndex = 18;
@@ -151,7 +159,7 @@
             // 
             // buttonStep
             // 
-            this.buttonStep.Location = new System.Drawing.Point(365, 3);
+            this.buttonStep.Location = new System.Drawing.Point(311, 3);
             this.buttonStep.Name = "buttonStep";
             this.buttonStep.Size = new System.Drawing.Size(49, 23);
             this.buttonStep.TabIndex = 17;
@@ -169,10 +177,10 @@
             this.columnValue});
             this.varView.GridLines = true;
             this.varView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
-            this.varView.Location = new System.Drawing.Point(519, 45);
+            this.varView.Location = new System.Drawing.Point(511, 43);
             this.varView.MultiSelect = false;
             this.varView.Name = "varView";
-            this.varView.Size = new System.Drawing.Size(227, 310);
+            this.varView.Size = new System.Drawing.Size(241, 505);
             this.varView.TabIndex = 19;
             this.varView.UseCompatibleStateImageBehavior = false;
             this.varView.View = System.Windows.Forms.View.Details;
@@ -180,26 +188,17 @@
             // columnExpander
             // 
             this.columnExpander.Text = "";
-            this.columnExpander.Width = 15;
+            this.columnExpander.Width = 10;
             // 
             // columnName
             // 
             this.columnName.Text = "Variable";
-            this.columnName.Width = 80;
+            this.columnName.Width = 87;
             // 
             // columnValue
             // 
             this.columnValue.Text = "Value";
-            this.columnValue.Width = 125;
-            // 
-            // labelSketch
-            // 
-            this.labelSketch.AutoSize = true;
-            this.labelSketch.Location = new System.Drawing.Point(0, 28);
-            this.labelSketch.Name = "labelSketch";
-            this.labelSketch.Size = new System.Drawing.Size(64, 13);
-            this.labelSketch.TabIndex = 20;
-            this.labelSketch.Text = "Your sketch";
+            this.columnValue.Width = 136;
             // 
             // sourceView
             // 
@@ -207,13 +206,15 @@
             this.columnBP,
             this.columnLineNum,
             this.columnLine});
+            this.sourceView.Enabled = false;
             this.sourceView.Font = new System.Drawing.Font("Lucida Console", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.sourceView.FullRowSelect = true;
             this.sourceView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.sourceView.Location = new System.Drawing.Point(3, 48);
+            this.sourceView.Location = new System.Drawing.Point(3, 43);
             this.sourceView.MultiSelect = false;
             this.sourceView.Name = "sourceView";
-            this.sourceView.Size = new System.Drawing.Size(502, 560);
+            this.sourceView.Size = new System.Drawing.Size(502, 565);
+            this.sourceView.SmallImageList = this.imageList1;
             this.sourceView.TabIndex = 22;
             this.sourceView.UseCompatibleStateImageBehavior = false;
             this.sourceView.View = System.Windows.Forms.View.Details;
@@ -235,9 +236,9 @@
             // 
             // buttonLoad
             // 
-            this.buttonLoad.Location = new System.Drawing.Point(3, 2);
+            this.buttonLoad.Location = new System.Drawing.Point(3, 3);
             this.buttonLoad.Name = "buttonLoad";
-            this.buttonLoad.Size = new System.Drawing.Size(117, 23);
+            this.buttonLoad.Size = new System.Drawing.Size(108, 23);
             this.buttonLoad.TabIndex = 23;
             this.buttonLoad.Text = "Load New Sketch";
             this.buttonLoad.UseVisualStyleBackColor = true;
@@ -247,6 +248,7 @@
             // 
             this.disassemblyView.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.disassemblyView.BackColor = System.Drawing.SystemColors.InactiveBorder;
             this.disassemblyView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnNum,
             this.columnText});
@@ -275,9 +277,9 @@
             // 
             // buttonStepOver
             // 
-            this.buttonStepOver.Location = new System.Drawing.Point(420, 4);
+            this.buttonStepOver.Location = new System.Drawing.Point(366, 3);
             this.buttonStepOver.Name = "buttonStepOver";
-            this.buttonStepOver.Size = new System.Drawing.Size(64, 23);
+            this.buttonStepOver.Size = new System.Drawing.Size(62, 23);
             this.buttonStepOver.TabIndex = 25;
             this.buttonStepOver.Text = "StepOver";
             this.buttonStepOver.UseVisualStyleBackColor = true;
@@ -285,19 +287,19 @@
             // 
             // buttonComms
             // 
-            this.buttonComms.Location = new System.Drawing.Point(87, 32);
+            this.buttonComms.Location = new System.Drawing.Point(154, 13);
             this.buttonComms.Name = "buttonComms";
-            this.buttonComms.Size = new System.Drawing.Size(131, 23);
-            this.buttonComms.TabIndex = 26;
-            this.buttonComms.Text = "Show/Hide Comms";
+            this.buttonComms.Size = new System.Drawing.Size(2, 2);
+            this.buttonComms.TabIndex = 28;
+            this.buttonComms.Text = "Show/Hide &Comms";
             this.buttonComms.UseVisualStyleBackColor = true;
             this.buttonComms.Click += new System.EventHandler(this.buttonComms_Click);
             // 
             // buttonDiss
             // 
-            this.buttonDiss.Location = new System.Drawing.Point(87, 61);
+            this.buttonDiss.Location = new System.Drawing.Point(154, 13);
             this.buttonDiss.Name = "buttonDiss";
-            this.buttonDiss.Size = new System.Drawing.Size(129, 23);
+            this.buttonDiss.Size = new System.Drawing.Size(84, 37);
             this.buttonDiss.TabIndex = 27;
             this.buttonDiss.Text = "Show/Hide Disassembly";
             this.buttonDiss.UseVisualStyleBackColor = true;
@@ -308,7 +310,7 @@
             this.panelStopped.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
             this.panelStopped.BackColor = System.Drawing.Color.Red;
             this.panelStopped.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panelStopped.Location = new System.Drawing.Point(551, 6);
+            this.panelStopped.Location = new System.Drawing.Point(563, 3);
             this.panelStopped.Name = "panelStopped";
             this.panelStopped.Size = new System.Drawing.Size(22, 22);
             this.panelStopped.TabIndex = 28;
@@ -318,59 +320,105 @@
             this.panelRunning.AccessibleName = " disassemblyView.Visible = !disassemblyView.Visible;";
             this.panelRunning.BackColor = System.Drawing.Color.DarkGreen;
             this.panelRunning.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            this.panelRunning.Location = new System.Drawing.Point(579, 5);
+            this.panelRunning.Location = new System.Drawing.Point(591, 3);
             this.panelRunning.Name = "panelRunning";
             this.panelRunning.Size = new System.Drawing.Size(22, 22);
             this.panelRunning.TabIndex = 29;
             // 
             // buttonReload
             // 
-            this.buttonReload.Location = new System.Drawing.Point(126, 3);
+            this.buttonReload.Enabled = false;
+            this.buttonReload.Location = new System.Drawing.Point(117, 3);
             this.buttonReload.Name = "buttonReload";
-            this.buttonReload.Size = new System.Drawing.Size(122, 23);
+            this.buttonReload.Size = new System.Drawing.Size(106, 23);
             this.buttonReload.TabIndex = 30;
             this.buttonReload.Text = "ReLoad Sketch";
             this.buttonReload.UseVisualStyleBackColor = true;
             this.buttonReload.Click += new System.EventHandler(this.buttonReload_Click);
             // 
-            // buttonFunctions
-            // 
-            this.buttonFunctions.Location = new System.Drawing.Point(87, 8);
-            this.buttonFunctions.Name = "buttonFunctions";
-            this.buttonFunctions.Size = new System.Drawing.Size(131, 23);
-            this.buttonFunctions.TabIndex = 31;
-            this.buttonFunctions.Text = "Function List";
-            this.buttonFunctions.UseVisualStyleBackColor = true;
-            this.buttonFunctions.Click += new System.EventHandler(this.buttonFunctions_Click);
-            // 
             // panel1
             // 
             this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.panel1.Controls.Add(this.buttonFunctions);
             this.panel1.Controls.Add(this.groupBox1);
             this.panel1.Controls.Add(this.buttonComms);
             this.panel1.Controls.Add(this.buttonDiss);
-            this.panel1.Location = new System.Drawing.Point(519, 523);
+            this.panel1.Location = new System.Drawing.Point(514, 554);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(222, 89);
+            this.panel1.Size = new System.Drawing.Size(241, 58);
             this.panel1.TabIndex = 32;
             // 
             // textBoxInput
             // 
-            this.textBoxInput.Location = new System.Drawing.Point(520, 361);
+            this.textBoxInput.Location = new System.Drawing.Point(3, 6);
             this.textBoxInput.Name = "textBoxInput";
-            this.textBoxInput.Size = new System.Drawing.Size(133, 20);
+            this.textBoxInput.Size = new System.Drawing.Size(139, 20);
             this.textBoxInput.TabIndex = 33;
             // 
             // buttonSend
             // 
-            this.buttonSend.Location = new System.Drawing.Point(664, 361);
+            this.buttonSend.Location = new System.Drawing.Point(148, 4);
             this.buttonSend.Name = "buttonSend";
-            this.buttonSend.Size = new System.Drawing.Size(75, 23);
+            this.buttonSend.Size = new System.Drawing.Size(58, 23);
             this.buttonSend.TabIndex = 34;
             this.buttonSend.Text = "Send";
             this.buttonSend.UseVisualStyleBackColor = true;
             this.buttonSend.Click += new System.EventHandler(this.buttonSend_Click);
+            // 
+            // panel2
+            // 
+            this.panel2.Controls.Add(this.buttonStepOut);
+            this.panel2.Controls.Add(this.buttonLoad);
+            this.panel2.Controls.Add(this.buttonReload);
+            this.panel2.Controls.Add(this.btnStart);
+            this.panel2.Controls.Add(this.buttonStep);
+            this.panel2.Controls.Add(this.panelStopped);
+            this.panel2.Controls.Add(this.panelRunning);
+            this.panel2.Controls.Add(this.buttonStepOver);
+            this.panel2.Controls.Add(this.btnStop);
+            this.panel2.Controls.Add(this.buttonRun);
+            this.panel2.Controls.Add(this.buttonPause);
+            this.panel2.Location = new System.Drawing.Point(3, 5);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(756, 32);
+            this.panel2.TabIndex = 36;
+            // 
+            // buttonStepOut
+            // 
+            this.buttonStepOut.Location = new System.Drawing.Point(434, 3);
+            this.buttonStepOut.Name = "buttonStepOut";
+            this.buttonStepOut.Size = new System.Drawing.Size(62, 23);
+            this.buttonStepOut.TabIndex = 31;
+            this.buttonStepOut.Text = "StepOut";
+            this.buttonStepOut.UseVisualStyleBackColor = true;
+            this.buttonStepOut.Click += new System.EventHandler(this.buttonStepOut_Click);
+            // 
+            // panelComms
+            // 
+            this.panelComms.Controls.Add(this.buttonCloseComms);
+            this.panelComms.Controls.Add(this.commsData);
+            this.panelComms.Controls.Add(this.buttonSend);
+            this.panelComms.Controls.Add(this.textBoxInput);
+            this.panelComms.Location = new System.Drawing.Point(514, 363);
+            this.panelComms.Name = "panelComms";
+            this.panelComms.Size = new System.Drawing.Size(240, 185);
+            this.panelComms.TabIndex = 37;
+            this.panelComms.Visible = false;
+            // 
+            // buttonCloseComms
+            // 
+            this.buttonCloseComms.Location = new System.Drawing.Point(212, 4);
+            this.buttonCloseComms.Name = "buttonCloseComms";
+            this.buttonCloseComms.Size = new System.Drawing.Size(25, 23);
+            this.buttonCloseComms.TabIndex = 29;
+            this.buttonCloseComms.Text = "X";
+            this.buttonCloseComms.UseVisualStyleBackColor = true;
+            this.buttonCloseComms.Click += new System.EventHandler(this.buttonCloseComms_Click);
+            // 
+            // imageList1
+            // 
+            this.imageList1.ImageStream = ((System.Windows.Forms.ImageListStreamer)(resources.GetObject("imageList1.ImageStream")));
+            this.imageList1.TransparentColor = System.Drawing.Color.Transparent;
+            this.imageList1.Images.SetKeyName(0, "breakpoint.png");
             // 
             // MainForm
             // 
@@ -378,31 +426,23 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.ClientSize = new System.Drawing.Size(757, 615);
-            this.Controls.Add(this.buttonSend);
-            this.Controls.Add(this.textBoxInput);
+            this.Controls.Add(this.panelComms);
+            this.Controls.Add(this.panel2);
             this.Controls.Add(this.panel1);
-            this.Controls.Add(this.buttonReload);
-            this.Controls.Add(this.panelRunning);
-            this.Controls.Add(this.btnStop);
-            this.Controls.Add(this.panelStopped);
-            this.Controls.Add(this.buttonStepOver);
-            this.Controls.Add(this.buttonRun);
-            this.Controls.Add(this.commsData);
             this.Controls.Add(this.disassemblyView);
-            this.Controls.Add(this.buttonStep);
-            this.Controls.Add(this.buttonLoad);
-            this.Controls.Add(this.buttonPause);
             this.Controls.Add(this.sourceView);
-            this.Controls.Add(this.labelSketch);
             this.Controls.Add(this.varView);
-            this.Controls.Add(this.btnStart);
+            this.MaximizeBox = false;
             this.Name = "MainForm";
             this.Text = "Arduino Debugger";
+            this.Load += new System.EventHandler(this.MainForm_Load);
             ((System.ComponentModel.ISupportInitialize)(this.serialSettingsBindingSource)).EndInit();
             this.groupBox1.ResumeLayout(false);
             this.panel1.ResumeLayout(false);
+            this.panel2.ResumeLayout(false);
+            this.panelComms.ResumeLayout(false);
+            this.panelComms.PerformLayout();
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 
@@ -416,7 +456,6 @@
         private System.Windows.Forms.Button btnStop;
         private System.Windows.Forms.Button buttonPause;
         private System.Windows.Forms.ListView varView;
-        private System.Windows.Forms.Label labelSketch;
         private System.Windows.Forms.ListView sourceView;
         private System.Windows.Forms.Button buttonLoad;
         private System.Windows.Forms.ColumnHeader columnBP;
@@ -437,11 +476,15 @@
         private System.Windows.Forms.Panel panelRunning;
         private System.Windows.Forms.Button buttonReload;
         private System.Windows.Forms.Timer timer1;
-        private System.Windows.Forms.Button buttonFunctions;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.TextBox textBoxInput;
         private System.Windows.Forms.Button buttonSend;
         private System.Windows.Forms.ColumnHeader columnExpander;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Button buttonStepOut;
+        private System.Windows.Forms.Panel panelComms;
+        private System.Windows.Forms.Button buttonCloseComms;
+        private System.Windows.Forms.ImageList imageList1;
     }
 }
 

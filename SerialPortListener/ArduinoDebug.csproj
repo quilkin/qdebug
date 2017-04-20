@@ -96,6 +96,7 @@
     <None Include="target\qdebugtest.ino" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="images\breakpoint.png" />
     <Content Include="licence.txt" />
     <Content Include="target2\analog_int.S" />
     <Content Include="target2\gdb-methods.cpp" />

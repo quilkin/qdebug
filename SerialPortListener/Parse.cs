@@ -1387,9 +1387,10 @@ namespace ArdDebug
                             //if (++bpCount > 1)// miss out lines before call to qdebug????
                             ++bpCount;
                             {
+#if !__GDB__
                                 bp.SetDetails(progCounter, line);
                                 Breakpoints.Add(bp);
-
+#endif
                                 // find the line in the source view and mark as appropriate
                                 ListView.ListViewItemCollection sourceItems = source.Items;
                                 if (bp.SourceLine < sourceItems.Count)

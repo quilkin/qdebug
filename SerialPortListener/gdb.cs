@@ -20,7 +20,7 @@ namespace ArdDebug
 
         public enum State : byte
         {
-            init, connected, typesFound, varsFound, funcsFound, setGlobals, ready, step,  getGlobals, getLocals, getArgs
+            init, connected, typesFound, varsFound, funcsFound, setGlobals, ready, step,  getGlobals, getLocals, getArgs, breakpoint, next, stepout,run
         }
         public State CurrentState { get { return state; } }
         public void SetState(State s) { state = s;  PromptReady = false; }
@@ -278,27 +278,33 @@ namespace ArdDebug
                     string[] parts = reply.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 1 || PromptReady)
                     {
-                        Interaction i = null;
+                        Interaction i =  new Interaction(CurrentState);
                         switch (CurrentState) {
                             case State.setGlobals:
-                                // just telling gdb which vars we want to display in future; not interested in values yet
-                                i = new Interaction(State.setGlobals);
+                                // just telling gdb which vars we want to display in future; not interested in values 
+                                //i = new Interaction(State.setGlobals);
+
                                 iHandler(this, i);
                                 break;
                             case State.getLocals:
+                                //i = new Interaction(State.getLocals);
                                 // locals are returned simply like this "a = 3"
-                                i = new Interaction(State.getLocals);
                                 i.var = reply;
                                 iHandler(this, i);
                                 break;
                             case State.getArgs:
                                 // locals are returned simply like this "a = 3"
-                                i = new Interaction(State.getArgs);
+                                // = new Interaction(State.getArgs);
+                                i.var = reply;
+                                iHandler(this, i);
+                                break;
+                            case State.breakpoint:
+                               // i = new Interaction(State.breakpoint);
                                 i.var = reply;
                                 iHandler(this, i);
                                 break;
                             case State.getGlobals:
-                                i = new Interaction(State.getGlobals);
+                                //i = new Interaction(State.getGlobals);
                                 if (PromptReady)
                                 {
                                     iHandler(this, i);
@@ -307,7 +313,7 @@ namespace ArdDebug
                                 if (parts[0].EndsWith(":"))
                                 {
                                     // return of a variable value
-                                    
+                                   
                                     i.var = "";
                                     for (int part = 1; part < parts.Length; part++)
                                         i.var += parts[part];
@@ -315,12 +321,16 @@ namespace ArdDebug
                                 }
                                 break;
                             case State.step:
-                                i = new Interaction(State.step);
-                                if (PromptReady)
-                                {
-                                    iHandler(this, i);
-                                    break;
-                                }
+                            case State.next:
+                            case State.run:
+                            case State.stepout:
+                                //i = new Interaction(CurrentState);
+                                //if (PromptReady)
+                                //{
+
+                                //    iHandler(this, i);
+                                //    break;
+                                //}
                                 int linenum = 0;
                                 if (int.TryParse(parts[0], out linenum))
                                 {
@@ -328,10 +338,19 @@ namespace ArdDebug
                                     i.linenum = linenum;
                                     iHandler(this, i);
                                 }
+                                else if (parts[0].StartsWith("0x"))
+                                {
+                                    // address rather tahn line number.
+                                    // next lines will be globals
+
+                                    i.linenum = 0;
+                                    iHandler(this, i);
+                                    Write("step");
+                                }
                                 else
                                 {
-                                    // not sure about this.....
-                                    iHandler(this, i);
+                                    //// not sure about this.....
+                                    //iHandler(this, i);
                                     break;
                                 }
                                 break;

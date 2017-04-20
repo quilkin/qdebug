@@ -36,9 +36,13 @@ namespace ArdDebug
             //baudRateComboBox.DataSource = mySerialSettings.BaudRateCollection;
 
             this.FormClosing += new FormClosingEventHandler(MainForm_FormClosing);
-            this.timer1.Enabled = false;
+            this.timer1.Enabled = true;
             this.timer1.Interval = 500;
+            this.timer1.Tick += timer1_Tick;
+            timer1.Stop();
         }
+
+
 
         delegate void buttonDelegate(bool enabled);
         public void RunButtons(bool enabled)
@@ -66,6 +70,7 @@ namespace ArdDebug
                 }
                 buttonStep.Enabled = enabled;
                 buttonStepOver.Enabled = enabled;
+                buttonStepOut.Enabled = enabled;
                 buttonRun.Enabled = enabled;
                 buttonPause.Enabled = !enabled;
             }
@@ -75,22 +80,20 @@ namespace ArdDebug
         {
             _spManager.Dispose();
         }
-
+        public void StopTimer()
+        {
+            timer1.Stop();
+        }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            if (disassemblyView.Items.Count < 10)
-            {
-                MessageBox.Show("Must open your Arduino sketch first!");
-                this.buttonLoad.Select();
-                return;
-            }
             
             RunButtons(false);
             buttonStep.Enabled = false;
             buttonStepOver.Enabled = false;
             buttonRun.Enabled = false;
             buttonPause.Enabled = false;
+            timer1.Start();
             Arduino.Startup(_spManager);
         }
 
@@ -110,6 +113,7 @@ namespace ArdDebug
         {
 #if __GDB__
             Arduino.NewCommand("break");
+            RunButtons(true);
 #else
             Arduino._Running.CancelAsync();
             //Arduino.pauseReqd = true;
@@ -129,7 +133,11 @@ namespace ArdDebug
         {
             if (Arduino.OpenFiles(this.sourceView,this.disassemblyView,this.varView,this.commsData))
             {
-                this.labelSketch.Text = Arduino.FullFilename;
+                //this.labelSketch.Text = Arduino.FullFilename;
+                this.Text = Arduino.FullFilename;
+                btnStart.Enabled = true;
+                buttonReload.Enabled = true;
+               
             }        
         }
 
@@ -155,27 +163,30 @@ namespace ArdDebug
         {
             Arduino.StepOver();
         }
-
+        private void buttonStepOut_Click(object sender, EventArgs e)
+        {
+            Arduino.StepOut();
+        }
         private void buttonComms_Click(object sender, EventArgs e)
         {
-            commsData.Visible = !commsData.Visible;
-            if (commsData.Visible)
-            {
-                varView.Height = 350;
-            }
-            else
-            {
-                varView.Height = 500;
-            }
+            //commsData.Visible = !commsData.Visible;
+            panelComms.Visible = true;
+            varView.Height = 300;
             varView.Refresh();
         }
+        private void buttonCloseComms_Click(object sender, EventArgs e)
+        {
+            panelComms.Visible = false;
+            varView.Height = 500;
+            varView.Refresh();
 
+        }
         private void buttonDiss_Click(object sender, EventArgs e)
         {
             disassemblyView.Visible = !disassemblyView.Visible;
             if (disassemblyView.Visible)
             {
-                sourceView.Height = 420;
+                sourceView.Height = 360;
             }
             else
             {
@@ -197,14 +208,6 @@ namespace ArdDebug
             }
         }
 
-        private void buttonFunctions_Click(object sender, EventArgs e)
-        {
-            Arduino.FunctionList();
-        }
-        
-        //public string InputText { get; private set; }
-
-        //public bool InputReady { get; set; }
 
         private void buttonSend_Click(object sender, EventArgs e)
         {
@@ -218,5 +221,14 @@ namespace ArdDebug
             }
 
         }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+
+        }
+
+
+
+
     }
 }
