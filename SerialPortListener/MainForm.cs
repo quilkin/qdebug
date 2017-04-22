@@ -172,12 +172,15 @@ namespace ArdDebug
             //commsData.Visible = !commsData.Visible;
             panelComms.Visible = true;
             varView.Height = 300;
+            sourceView.Height = 300;
+            sourceView.Refresh();
             varView.Refresh();
         }
         private void buttonCloseComms_Click(object sender, EventArgs e)
         {
             panelComms.Visible = false;
             varView.Height = 500;
+            sourceView.Height = 620;
             varView.Refresh();
 
         }

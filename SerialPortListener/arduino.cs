@@ -213,6 +213,7 @@ namespace ArdDebug
         {
             Variable var;
             string[] parts;
+            char[] delimiters = new char[] { '=',' ' };
             switch (e.state)
             {
                 case GDB.State.setGlobals:
@@ -257,6 +258,12 @@ namespace ArdDebug
                         NewCommand("info args");
                         return;
                     }
+                    if (e.var.Contains("No symbol table"))
+                    {
+                        gdb.SetState(GDB.State.ready);
+                        GUI.RunButtons(true);
+                        return;
+                    }
                     if (gdb.PromptReady)
                     {
                         UpdateLocals();
@@ -265,16 +272,34 @@ namespace ArdDebug
                         return;
                     }
                     // e.var contains something like "var=3" or "var={3,4,5}"
-                    parts = e.var.Split('=');
+                    parts = e.var.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length < 2)
                         return;
-                    // locals won't be in the list of variables
-                    var = new Variable(this);
-                    var.Name = parts[0];
-                    var.currentValue = parts[1];
-                    var.isGlobal = false;
-                    LocalVariables.Add(var);
-                    //UpdateVariableInWindow(var);
+
+                    var = LocalVariables.Find(x => x.Name == parts[0]);
+                    if (var == null)
+                    {
+                        var = new Variable(this);
+                        var.Name = parts[0];
+                        if (var.Name.Contains(':'))
+                        {
+                            // error here....
+                            return;
+                        }
+                        if (var.Name.Contains("(gdb)"))
+                        {
+                            // error here....
+                            return;
+                        }
+                        var.isGlobal = false;
+                        var.currentValue = parts[1];
+                        LocalVariables.Add(var);
+                    }
+                    else
+                    {
+                        var.currentValue = parts[1];
+                    }
+
                     break;
 
 
@@ -302,30 +327,49 @@ namespace ArdDebug
                         // wait for new command from user
                     }
                     // e.var contains something like "var=3" or "var={3,4,5}"
-                    parts = e.var.Split('=');
-                    // locals won't be in the list of variables
-                    var = new Variable(this);
-                    var.Name = parts[0];
-                    var.currentValue = parts[1];
-                    var.isGlobal = false;
-                    ArgVariables.Add(var);
-                    //UpdateVariableInWindow(var);
+                    
+                    parts = e.var.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    var = ArgVariables.Find(x => x.Name == parts[0]);
+                    if (var == null)
+                    {
+                        var = new Variable(this);
+                        var.Name = parts[0];
+                        if (var.Name.Contains("(gdb)"))
+                        {
+                            // error here....
+                            return;
+                        }
+                        var.isGlobal = false;
+                        var.currentValue = parts[1];
+                        ArgVariables.Add(var);
+                    }
+                    else
+                    {
+                        var.currentValue = parts[1];
+                    }
                     break;
 
 
                 case GDB.State.step:
                 case GDB.State.next:
                 case GDB.State.run:
-                case GDB.State.stepout:
-
                     if (gdb.PromptReady)
                     {
                         return;
                         // wait for new command from user
                     }
-
                     UpdateSource(e.linenum - 1);
-                    //if (gdb.PromptReady)
+                    {
+                        gdb.SetState(GDB.State.getGlobals);
+                    }
+                    break;
+                case GDB.State.stepout:
+                    if (gdb.PromptReady)
+                    {
+                        return;
+                        // wait for new command from user
+                    }
+                    UpdateSource(e.linenum - 1);
                     {
                         gdb.SetState(GDB.State.getGlobals);
                     }
@@ -1083,7 +1127,7 @@ namespace ArdDebug
                     {
 
                         lvi = var.CreateVarViewItem();
-                        if (var.currentValue == " <optimized out>")
+                        if (var.currentValue.Contains("<optimized"))
                         {
                             var.currentValue = "Unavailable";
                         }
@@ -1353,8 +1397,11 @@ namespace ArdDebug
         delegate void updateSourceDelegate(int linenum);
         void UpdateSource(int linenum)
         {
+            if (source == null)
+                return;
             if (linenum < 0)
                 return;
+
             if (source.InvokeRequired)
             {
                 updateSourceDelegate d = new updateSourceDelegate(UpdateSource);
@@ -1362,8 +1409,19 @@ namespace ArdDebug
             }
             else
             {
-                if (source == null)
+                if (linenum > source.Items.Count)
+                {
+                    // not in this file; not dealing with this situation yet
+                    // keep selected line as before
+                    if (currentLine > 0)
+                    {
+                        source.Items[currentLine].Selected = true;
+                        source.Select();
+                        source.EnsureVisible(currentLine);
+                    }
                     return;
+                }
+
                 if (currentLine > 0 && currentLine < source.Items.Count)
                 {
                     source.Items[currentLine].Selected = false;

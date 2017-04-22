@@ -129,11 +129,11 @@
             // 
             this.commsData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.commsData.Font = new System.Drawing.Font("Lucida Console", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.commsData.Location = new System.Drawing.Point(0, 36);
+            this.commsData.Location = new System.Drawing.Point(3, 33);
             this.commsData.Multiline = true;
             this.commsData.Name = "commsData";
             this.commsData.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.commsData.Size = new System.Drawing.Size(241, 146);
+            this.commsData.Size = new System.Drawing.Size(736, 146);
             this.commsData.TabIndex = 13;
             // 
             // buttonPause
@@ -349,14 +349,14 @@
             // 
             // textBoxInput
             // 
-            this.textBoxInput.Location = new System.Drawing.Point(3, 6);
+            this.textBoxInput.Location = new System.Drawing.Point(505, 8);
             this.textBoxInput.Name = "textBoxInput";
             this.textBoxInput.Size = new System.Drawing.Size(139, 20);
             this.textBoxInput.TabIndex = 33;
             // 
             // buttonSend
             // 
-            this.buttonSend.Location = new System.Drawing.Point(148, 4);
+            this.buttonSend.Location = new System.Drawing.Point(656, 6);
             this.buttonSend.Name = "buttonSend";
             this.buttonSend.Size = new System.Drawing.Size(58, 23);
             this.buttonSend.TabIndex = 34;
@@ -398,15 +398,15 @@
             this.panelComms.Controls.Add(this.commsData);
             this.panelComms.Controls.Add(this.buttonSend);
             this.panelComms.Controls.Add(this.textBoxInput);
-            this.panelComms.Location = new System.Drawing.Point(514, 363);
+            this.panelComms.Location = new System.Drawing.Point(12, 363);
             this.panelComms.Name = "panelComms";
-            this.panelComms.Size = new System.Drawing.Size(240, 185);
+            this.panelComms.Size = new System.Drawing.Size(742, 185);
             this.panelComms.TabIndex = 37;
             this.panelComms.Visible = false;
             // 
             // buttonCloseComms
             // 
-            this.buttonCloseComms.Location = new System.Drawing.Point(212, 4);
+            this.buttonCloseComms.Location = new System.Drawing.Point(717, 6);
             this.buttonCloseComms.Name = "buttonCloseComms";
             this.buttonCloseComms.Size = new System.Drawing.Size(25, 23);
             this.buttonCloseComms.TabIndex = 29;

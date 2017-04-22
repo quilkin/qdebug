@@ -99,9 +99,20 @@ namespace ArdDebug
                     for (int i=0; i < lines.Length; i++)
                     {
                         string str = lines[i];
-                        if (i == lines.Length-1)
+
+                        if (i == lines.Length - 1)
                         {
                             PromptReady = true;
+                        }
+                        else
+                        {
+                            if (str.StartsWith("(gdb)"))
+                            {
+                                // two (gdb)'s in one response....
+                                str = str.Substring(5);
+                                AvrGdb_OutputDataReceived("(gdb)");
+
+                            }
                         }
 
                          AvrGdb_OutputDataReceived(str);
@@ -324,7 +335,6 @@ namespace ArdDebug
                             case State.next:
                             case State.run:
                             case State.stepout:
-                                //i = new Interaction(CurrentState);
                                 //if (PromptReady)
                                 //{
 
@@ -338,14 +348,14 @@ namespace ArdDebug
                                     i.linenum = linenum;
                                     iHandler(this, i);
                                 }
+
+                                else if (reply.Contains("__table"))
+                                {
+                                    SetState(State.getGlobals);
+                                }
                                 else if (parts[0].StartsWith("0x"))
                                 {
-                                    // address rather tahn line number.
-                                    // next lines will be globals
 
-                                    i.linenum = 0;
-                                    iHandler(this, i);
-                                    Write("step");
                                 }
                                 else
                                 {
