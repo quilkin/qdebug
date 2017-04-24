@@ -322,8 +322,8 @@ namespace ArdDebug
                                     // return of a variable value
                                    
                                     i.var = "";
-                                    for (int part = 1; part < parts.Length; part++)
-                                        i.var += parts[part];
+                                    for (int part = 2; part < parts.Length; part++)
+                                        i.var += (parts[part]) ;
                                     iHandler(this, i);
                                 }
                                 if (PromptReady)

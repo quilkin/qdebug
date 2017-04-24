@@ -181,7 +181,9 @@ namespace ArdDebug
                     {
                         ListViewItem lvi = var.CreateVarViewItem();
                         if (lvi != null)
+                        {
                             varView.Items.Add(lvi);
+                        }
                     }
                 }
                 gdb.PromptReady = false;
@@ -204,7 +206,7 @@ namespace ArdDebug
                     {
                         name = name.Substring(0, arrayBracket);
                     }
-                    NewCommand("display " + name);
+                    NewCommand("display/d " + name);
                     // wait for reply
                     return;
                 }
@@ -1153,44 +1155,16 @@ namespace ArdDebug
                     varView.Items.Remove(lvi);
                     return;
                 }
-                if (var.currentValue.Contains('\\'))
-                {
-                    if (var.Type.Name == "char")
-                    {
-                        // convert from octal
-                        // may be an array "\000\000\000....." or just a single value
-                        char[] delimiters = new char[] { '\\', '"' };
-                        string[] octals = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-                        string newString = "{";
-                        foreach (string octal in octals)
-                        {
-                            int val = 0;
-                            if (octal.Length == 1)
-                            {
-                                val = octal[0];
-                            }
-                            else if (octal.Length == 3)
-                            {
-                                val = octal[0] - '0';
-                                val = (val << 3) + (octal[1] - '0');
-                                val = (val << 3) + (octal[2] - '0');
 
-                            }
-                            newString += val;
-                            if (val >= 32 && val < 127)
-                                newString += string.Format("({0})", (char)val);
-                            newString += ',';
-                        }
-                        newString += '}';
-                        var.currentValue = newString;
+                
 
-                    }
-                }
-                lvi.SubItems[2].Text = var.currentValue;
 
                 if (var.currentValue != var.lastValue)
                 {
+                    lvi.SubItems[2].Text = var.currentValue;
+
                     lvi.ForeColor = System.Drawing.Color.Red;
+
                     // if this is a pointer, and it has changed, 
                     //   we need to also find a new value for the value pointed to, if it's currently displayed
                     if (var.isPointer)
@@ -1208,24 +1182,36 @@ namespace ArdDebug
                             }
                         }
                     }
-                    else if (var.isArray)
+                    else if (var.isArray )
                     {
-                        // get the individual array elements
-                        // e.g. {elem1,elem2,elem3,...}
+
+                            // get the individual array elements
+                            // e.g. {elem1,elem2,elem3,...}
                         char[] delimiters = new char[] { '{', '}', ',', ' ' };
                         string[] arrayElements = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
                         int i = 0;
+                        string arrayStr = string.Empty;
                         foreach (string elem in arrayElements)
                         { 
                             string arrayElement = var.Name + '[' + i + ']';
-
+                            byte elemNum = 0;
+                            string addedChar = string.Empty;
+                            byte.TryParse(elem, out elemNum);
+                            if (var.Type.Name == "char" && elemNum > '0' && elemNum < 127)
+                            {
+                                arrayStr += (char)elemNum;
+                            }
                             // find the correct row and update it
                             ListViewItem[] items = vars.Find(arrayElement, false);
                             if (items != null && items.Length == 1)
                             {
-                                items[0].SubItems[2].Text = elem;
+                                items[0].SubItems[2].Text = elem  + string.Format(" '{0}'", (char)elemNum);
                             }
                             ++i;
+                        }
+                        if (arrayStr.Length > 0)
+                        {
+                            lvi.SubItems[2].Text = arrayStr + " " + lvi.SubItems[2].Text;
                         }
                     }
                     else if (var.isStruct)
@@ -1235,9 +1221,6 @@ namespace ArdDebug
                         int i = 0;
                         for (int elem = 0; elem < structMembers.Length; elem += 2)
                         {
-                            //Variable structMember = new Variable(this);
-                            //structMember.Type = var.Type;
-                            //structMember.currentValue = structMembers[elem + 1];
                             string structMember = var.Name + '.' + structMembers[elem];
 
                             // find the correct row and update it
@@ -1247,16 +1230,7 @@ namespace ArdDebug
                                 items[0].SubItems[2].Text = structMembers[elem + 1];
                             }
                             ++i;
-                            //string[] items = { " ", "  " + structMember.Name, structMember.currentValue };
-                            //ListViewItem structItem = new ListViewItem(items);
-                            //structItem.Name = structMember.Name;
-                            //structItem.BackColor = System.Drawing.Color.Azure;
-                            //varView.Items.Insert(++index, structItem);
 
-                            //// tag the new row with the row that was expanded, so we can easily unexpand later
-                            //clicked.Tag = itemName;      // this should be unique
-                            //structItem.Tag = clicked.Tag;
-                            //++i;
                         }
 
                     }

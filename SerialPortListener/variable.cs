@@ -303,7 +303,6 @@ namespace ArdDebug
             //if (Address != 0)
             lvi.SubItems.Add(Name);
             lvi.SubItems.Add(currentValue);
- 
             return lvi;
         }
         
