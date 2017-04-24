@@ -316,11 +316,7 @@ namespace ArdDebug
                                 break;
                             case State.getGlobals:
                                 //i = new Interaction(State.getGlobals);
-                                if (PromptReady)
-                                {
-                                    iHandler(this, i);
-                                    break;
-                                }
+
                                 if (parts[0].EndsWith(":"))
                                 {
                                     // return of a variable value
@@ -329,6 +325,11 @@ namespace ArdDebug
                                     for (int part = 1; part < parts.Length; part++)
                                         i.var += parts[part];
                                     iHandler(this, i);
+                                }
+                                if (PromptReady)
+                                {
+                                    iHandler(this, i);
+                                    break;
                                 }
                                 break;
                             case State.step:
@@ -352,6 +353,7 @@ namespace ArdDebug
                                 else if (reply.Contains("__table"))
                                 {
                                     SetState(State.getGlobals);
+                                    _arduino.extraStepNeeded = true;
                                 }
                                 else if (parts[0].StartsWith("0x"))
                                 {

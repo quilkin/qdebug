@@ -1,9 +1,19 @@
 ﻿
-breakpoints
+
 better current line updating
 catch exceptions
 
 save com port between sesssions
 flexible window sizes
-current line highlighted while waiting for next
+
 new logo
+
+getargs happens twice
+stop/close not effective
+conversion of octal when ascii
+//expanded arrays not updating
+pointers
+structs
+comms window -> debug window
+
+restart - no com port

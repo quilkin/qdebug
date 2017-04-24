@@ -188,7 +188,7 @@
             // columnExpander
             // 
             this.columnExpander.Text = "";
-            this.columnExpander.Width = 10;
+            this.columnExpander.Width = 18;
             // 
             // columnName
             // 

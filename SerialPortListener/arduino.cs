@@ -49,6 +49,7 @@ namespace ArdDebug
         /// </summary>
         private Breakpoint nextBreakpoint = null;
         private String comString = String.Empty;
+        public bool extraStepNeeded = false;
         private enum State : byte
         {
             init, running, stopped
@@ -64,15 +65,17 @@ namespace ArdDebug
             int len = typeParts.Length;
             var.Name = typeParts[len - 1];
             string typename = typeParts[len - 2];
-            if (typeParts[0] == "struct")
-                typename = "struct " + typename;
+            if (this.ReservedTypeWords.Contains(typename) == false && this.TypedefWords.Contains(typename) == false)
+                var.isStruct = true;
+            //if (typeParts[0] == "struct")
+            //    typename = "struct " + typename;
             VariableType type = VariableTypes.Find(x => x.Name == typename);
             if (type != null)
                 var.Type = type;
             foreach (string part in typeParts)
             {
-                if (part == "struct")
-                    var.isStruct = true;
+                //if (part == "struct")
+
                 if (part == "*")
                     var.isPointer = true;
             }
@@ -240,28 +243,32 @@ namespace ArdDebug
                         NewCommand("info locals");
                         return;
                     }
-                    // e.var contains something like "var=3" or "var={3,4,5}"
-                    parts = e.var.Split('=');
-                    var = Variables.Find(x => parts[0] == x.Name);
-                    if (var != null)
+                    // e.var contains something like "var=3" or (array) "var={3,4,5}" or (struct) "var={t1=0,t2="\000\000\000\000\000\000"}"
+
+                    //parts = e.var.Split('=');
+                    int equals = e.var.IndexOf('=');
+                    if (equals > 0)
                     {
-                        var.currentValue = parts[1];
-                        UpdateVariableInWindow(var);
+                        string varName = e.var.Substring(0, equals);
+                        var = Variables.Find(x => varName == x.Name);
+                        if (var != null)
+                        {
+                            var.currentValue = e.var.Substring(equals+1);
+                            UpdateVariableInWindow(var);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Incorrectly formatted variable: " + e.var, "Error");
                     }
                     break;
 
                 case GDB.State.getLocals:
 
-                    if (e.var.Contains("No locals"))
+                    if (e.var.Contains("No locals") || e.var.Contains("No symbol table"))
                     {
                         LocalVariables.Clear();
                         NewCommand("info args");
-                        return;
-                    }
-                    if (e.var.Contains("No symbol table"))
-                    {
-                        gdb.SetState(GDB.State.ready);
-                        GUI.RunButtons(true);
                         return;
                     }
                     if (gdb.PromptReady)
@@ -305,22 +312,28 @@ namespace ArdDebug
 
                 case GDB.State.getArgs:
 
-                    if (e.var.Contains("No arguments"))
+                    if (e.var.Contains("No arguments") || e.var.Contains("No symbol table"))
                     {
                         ArgVariables.Clear();
+                        UpdateArgs();
+                        if (extraStepNeeded)
+                        {
+                            NewCommand("step");
+                            return;
+                        }
                         gdb.SetState(GDB.State.ready);
                         GUI.RunButtons(true);
                         return;
                     }
-                    if (e.var.Contains("No symbol table"))
-                    {
-                        gdb.SetState(GDB.State.ready);
-                        GUI.RunButtons(true);
-                        return;
-                    }
+
                     if (gdb.PromptReady)
                     {
                         UpdateArgs();
+                        if (extraStepNeeded)
+                        {
+                            NewCommand("step");
+                            return;
+                        }
                         gdb.SetState(GDB.State.ready);
                         GUI.RunButtons(true);
                         return;
@@ -353,27 +366,17 @@ namespace ArdDebug
                 case GDB.State.step:
                 case GDB.State.next:
                 case GDB.State.run:
-                    if (gdb.PromptReady)
-                    {
-                        return;
-                        // wait for new command from user
-                    }
-                    UpdateSource(e.linenum - 1);
-                    {
-                        gdb.SetState(GDB.State.getGlobals);
-                    }
-                    break;
                 case GDB.State.stepout:
-                    if (gdb.PromptReady)
+                    if (gdb.PromptReady && extraStepNeeded == false)
                     {
                         return;
                         // wait for new command from user
                     }
-                    UpdateSource(e.linenum - 1);
-                    {
-                        gdb.SetState(GDB.State.getGlobals);
-                    }
+                    extraStepNeeded  = (UpdateSource(e.linenum) == false);
+                    gdb.SetState(GDB.State.getGlobals);
                     break;
+                
+
                 case GDB.State.breakpoint:
                     if (gdb.PromptReady)
                     {
@@ -881,6 +884,7 @@ namespace ArdDebug
             {
                 MessageBox.Show(ex.ToString(), "Sorry there has been a problem (C)");
             }
+
 #else
             if (varView.SelectedItems.Count == 0)
                 return;
@@ -1160,17 +1164,22 @@ namespace ArdDebug
                         string newString = "{";
                         foreach (string octal in octals)
                         {
-                            if (octal.Length == 3)
+                            int val = 0;
+                            if (octal.Length == 1)
                             {
-                                int val = octal[0] - '0';
+                                val = octal[0];
+                            }
+                            else if (octal.Length == 3)
+                            {
+                                val = octal[0] - '0';
                                 val = (val << 3) + (octal[1] - '0');
                                 val = (val << 3) + (octal[2] - '0');
-                                newString += val;
-                                if (val >= 32 && val < 127)
-                                    newString += '(' + (char)val + ')';
-                                newString += ',';
+
                             }
-                            
+                            newString += val;
+                            if (val >= 32 && val < 127)
+                                newString += string.Format("({0})", (char)val);
+                            newString += ',';
                         }
                         newString += '}';
                         var.currentValue = newString;
@@ -1199,6 +1208,59 @@ namespace ArdDebug
                             }
                         }
                     }
+                    else if (var.isArray)
+                    {
+                        // get the individual array elements
+                        // e.g. {elem1,elem2,elem3,...}
+                        char[] delimiters = new char[] { '{', '}', ',', ' ' };
+                        string[] arrayElements = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                        int i = 0;
+                        foreach (string elem in arrayElements)
+                        { 
+                            string arrayElement = var.Name + '[' + i + ']';
+
+                            // find the correct row and update it
+                            ListViewItem[] items = vars.Find(arrayElement, false);
+                            if (items != null && items.Length == 1)
+                            {
+                                items[0].SubItems[2].Text = elem;
+                            }
+                            ++i;
+                        }
+                    }
+                    else if (var.isStruct)
+                    {
+                        char[] delimiters = new char[] { '{', '}', ',', ' ', '=' };
+                        string[] structMembers = var.currentValue.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                        int i = 0;
+                        for (int elem = 0; elem < structMembers.Length; elem += 2)
+                        {
+                            //Variable structMember = new Variable(this);
+                            //structMember.Type = var.Type;
+                            //structMember.currentValue = structMembers[elem + 1];
+                            string structMember = var.Name + '.' + structMembers[elem];
+
+                            // find the correct row and update it
+                            ListViewItem[] items = vars.Find(structMember, false);
+                            if (items != null && items.Length == 1)
+                            {
+                                items[0].SubItems[2].Text = structMembers[elem + 1];
+                            }
+                            ++i;
+                            //string[] items = { " ", "  " + structMember.Name, structMember.currentValue };
+                            //ListViewItem structItem = new ListViewItem(items);
+                            //structItem.Name = structMember.Name;
+                            //structItem.BackColor = System.Drawing.Color.Azure;
+                            //varView.Items.Insert(++index, structItem);
+
+                            //// tag the new row with the row that was expanded, so we can easily unexpand later
+                            //clicked.Tag = itemName;      // this should be unique
+                            //structItem.Tag = clicked.Tag;
+                            //++i;
+                        }
+
+                    }
+
                 }
                 else
                 {
@@ -1394,13 +1456,13 @@ namespace ArdDebug
 
 
 #if __GDB__
-        delegate void updateSourceDelegate(int linenum);
-        void UpdateSource(int linenum)
+        delegate bool updateSourceDelegate(int linenum);
+        bool UpdateSource(int linenum)
         {
             if (source == null)
-                return;
-            if (linenum < 0)
-                return;
+                return false;
+            //if (linenum < 0)
+            //    return;
 
             if (source.InvokeRequired)
             {
@@ -1409,7 +1471,7 @@ namespace ArdDebug
             }
             else
             {
-                if (linenum > source.Items.Count)
+                if (linenum < 0 ||linenum > source.Items.Count)
                 {
                     // not in this file; not dealing with this situation yet
                     // keep selected line as before
@@ -1419,7 +1481,7 @@ namespace ArdDebug
                         source.Select();
                         source.EnsureVisible(currentLine);
                     }
-                    return;
+                    return false;
                 }
 
                 if (currentLine > 0 && currentLine < source.Items.Count)
@@ -1436,6 +1498,7 @@ namespace ArdDebug
                     source.Select();
                     source.EnsureVisible(linenum);
                 }
+
                 // find the line that contains the current breakpoint
                 // ListView.ListViewItemCollection sourceItems = source.Items;
                 //int linecount = 0;
@@ -1456,7 +1519,7 @@ namespace ArdDebug
                 //    source.EnsureVisible(linenum);
                 //}
             }
-
+            return true;
         }
 #else
         delegate void updateSourceDelegate();

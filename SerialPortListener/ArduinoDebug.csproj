@@ -36,6 +36,9 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>images\arduino_0000.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -96,7 +99,10 @@
     <None Include="target\qdebugtest.ino" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="arduino_0000.ico" />
+    <Content Include="images\arduino_0000.ico" />
     <Content Include="images\breakpoint.png" />
+    <Content Include="images\logo.PNG" />
     <Content Include="licence.txt" />
     <Content Include="target2\analog_int.S" />
     <Content Include="target2\gdb-methods.cpp" />
